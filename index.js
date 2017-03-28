@@ -24,7 +24,7 @@ if (!process.env.API_TOKEN) {
 var bot = new TelegramBot(process.env.API_TOKEN, {polling: true})
 
 var events = []
-var groups = []
+var groups = [224942920]
 fs.readFile(EVENTS_FILE, (err, eventsData) => {
   if (!err) {
     events = JSON.parse(eventsData)
@@ -138,7 +138,8 @@ function todaysFood (id) {
           break
       }
     }
-    cb(res + edullisesti + maukkaasti + makeasti)
+    let footer = '\n[Äänestä suosikkia!](https://kumpulafood.herokuapp.com)'
+    cb(res + edullisesti + maukkaasti + makeasti + footer)
   }
 
   request.get(FOODLIST_URL, (err, res, body) => {
@@ -168,9 +169,12 @@ function weather() {
     if (err) return
     var obj = JSON.parse(body).query.results.channel
     
+    let sunrise = moment(obj.astronomy.sunrise, ["h:mm A"])
+    let sunset = moment(obj.astronomy.sunset, ["h:mm A"])
+    
     var resStr = `*Lämpötila on Helsingissä ${obj.item.condition.temp}°C,  ${translations.conditions[obj.item.condition.code]} ${translations.emoji[obj.item.condition.code]} . `
-    resStr += `Aurinko nousee ${moment(obj.astronomy.sunrise, ["h:mm A"]).format('HH:mm')} ja laskee ${moment(obj.astronomy.sunset, ["h:mm A"]).format('HH:mm')}.*`
-
+    resStr += `Aurinko ${moment().isBefore(moment(obj.astronomy.sunrise, ['h:mm A'])) ? 'nousee' : 'nousi'} ${moment(obj.astronomy.sunrise, ["h:mm A"]).format('HH:mm')} ja laskee ${moment(obj.astronomy.sunset, ["h:mm A"]).format('HH:mm')}.*`
+ 
     for (var g of groups) {
       bot.sendMessage(g, resStr.trim(), {
         parse_mode: 'Markdown'
@@ -178,6 +182,8 @@ function weather() {
     }
   })
 }
+
+todaysFood();
 
 cron.schedule('0 0 7 * * *', () => {
   todaysEvents()
