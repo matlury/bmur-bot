@@ -202,8 +202,6 @@ function weather() {
   })
 }
 
-todaysFood();
-
 cron.schedule('0 0 7 * * *', () => {
   todaysEvents()
   weather()
