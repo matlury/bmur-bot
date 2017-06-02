@@ -21,7 +21,7 @@ if (!process.env.API_TOKEN) {
   process.exit(1)
 }
 
-var bot = new TelegramBot(process.env.API_TOKEN, {polling: true})
+var bot = new TelegramBot(process.env.API_TOKEN, { polling: true })
 
 var events = []
 var groups = [224942920]
@@ -40,16 +40,16 @@ fs.readFile(EVENTS_FILE, (err, eventsData) => {
   })
 })
 
-function saveEvents (data, cb) {
+function saveEvents(data, cb) {
   fs.writeFile(EVENTS_FILE, JSON.stringify(data), cb)
 }
 
-function eventDifference (data, events) {
+function eventDifference(data, events) {
   var difference = R.difference(data.map(e => e.id), events.map(e => e.id))
   return data.filter(e => difference.includes(e.id))
 }
 
-function pollEvents () {
+function pollEvents() {
   retrieveEvents(function (data) {
     saveEvents(data)
     var difference = eventDifference(data, events)
@@ -60,21 +60,21 @@ function pollEvents () {
   })
 }
 
-function getEventURL (id) {
+function getEventURL(id) {
   return 'http://tko-aly.fi/event/' + id
 }
 
-function makeHumanReadable (dateFormat) {
+function makeHumanReadable(dateFormat) {
   return function (e) {
     return moment(e.starts).format(dateFormat) + ': [' + e.name.trim() + '](' + getEventURL(e.id) + ')'
   }
 }
 
-function retrieveEvents (cb) {
+function retrieveEvents(cb) {
   tkoalyevents(cb)
 }
 
-function listEvents (events, dateFormat) {
+function listEvents(events, dateFormat) {
   var res = ''
   var data = events.map(makeHumanReadable(dateFormat))
   for (var i = 0; i < data.length; i++) {
@@ -84,7 +84,7 @@ function listEvents (events, dateFormat) {
   return res
 }
 
-function todaysEvents () {
+function todaysEvents() {
   var today = moment()
   var data = events.filter(e => moment(e.starts).isSame(today, 'day'))
   if (data && data.length > 0) {
@@ -99,7 +99,7 @@ function todaysEvents () {
   }
 }
 
-function newEvents (events) {
+function newEvents(events) {
   if (!events) {
     return
   }
@@ -118,7 +118,7 @@ function newEvents (events) {
   }
 }
 
-function todaysFood (id) {
+function todaysFood(id) {
   this.createFoodList = (str, array, cb) => {
     var res = str
     var edullisesti = '*Edullisesti:* \n'
@@ -145,7 +145,16 @@ function todaysFood (id) {
   request.get(FOODLIST_URL, (err, res, body) => {
     var header = '*Päivän ruoka:* \n\n*UniCafe Exactum:* \n\n'
     if (err) return
-    this.createFoodList(header, JSON.parse(body).exactum, (res) => {
+    let exactum = JSON.parse(body).exactum;
+    if (!exactum.length) {
+      for (var j = 0; j < groups.length; j++) {
+        bot.sendMessage(groups[j], header + 'ei ruokaa lol'.trim(), {
+          parse_mode: 'Markdown'
+        });
+      }
+      return;
+    }
+    this.createFoodList(header, exactum, (res) => {
       for (var j = 0; j < groups.length; j++) {
         bot.sendMessage(groups[j], res.trim(), {
           parse_mode: 'Markdown'
@@ -154,7 +163,17 @@ function todaysFood (id) {
     });
 
     var header = '*Päivän ruoka:* \n\n*UniCafe Chemicum:* \n\n'
-    this.createFoodList(header, JSON.parse(body).chemicum, (res) => {
+    if (err) return
+    let chemicum = JSON.parse(body).chemicum;
+    if (!exactum.length) {
+      for (var j = 0; j < groups.length; j++) {
+        bot.sendMessage(groups[j], header + 'ei ruokaa lol'.trim(), {
+          parse_mode: 'Markdown'
+        });
+      }
+      return;
+    }
+    this.createFoodList(header, chemicum, (res) => {
       for (var j = 0; j < groups.length; j++) {
         bot.sendMessage(groups[j], res.trim(), {
           parse_mode: 'Markdown'
@@ -168,13 +187,13 @@ function weather() {
   request.get(WEATHER_URL, (err, res, body) => {
     if (err) return
     var obj = JSON.parse(body).query.results.channel
-    
+
     let sunrise = moment(obj.astronomy.sunrise, ["h:mm A"])
     let sunset = moment(obj.astronomy.sunset, ["h:mm A"])
-    
+
     var resStr = `*Lämpötila on Helsingissä ${obj.item.condition.temp}°C,  ${translations.conditions[obj.item.condition.code]} ${translations.emoji[obj.item.condition.code]} . `
     resStr += `Aurinko ${moment().isBefore(moment(obj.astronomy.sunrise, ['h:mm A'])) ? 'nousee' : 'nousi'} ${moment(obj.astronomy.sunrise, ["h:mm A"]).format('HH:mm')} ja laskee ${moment(obj.astronomy.sunset, ["h:mm A"]).format('HH:mm')}.*`
- 
+
     for (var g of groups) {
       bot.sendMessage(g, resStr.trim(), {
         parse_mode: 'Markdown'
