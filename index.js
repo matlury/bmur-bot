@@ -148,7 +148,7 @@ function todaysFood(id) {
     let exactum = JSON.parse(body).exactum;
     if (!exactum.length) {
       for (var j = 0; j < groups.length; j++) {
-        bot.sendMessage(groups[j], header + 'ei ruokaa lol'.trim(), {
+        bot.sendMessage(groups[j], header + 'ei ruokaa 😭😭😭'.trim(), {
           parse_mode: 'Markdown'
         });
       }
@@ -167,7 +167,7 @@ function todaysFood(id) {
     let chemicum = JSON.parse(body).chemicum;
     if (!exactum.length) {
       for (var j = 0; j < groups.length; j++) {
-        bot.sendMessage(groups[j], header + 'ei ruokaa lol'.trim(), {
+        bot.sendMessage(groups[j], header + 'ei ruokaa 😭😭😭'.trim(), {
           parse_mode: 'Markdown'
         });
       }
