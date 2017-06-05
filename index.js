@@ -152,15 +152,15 @@ function todaysFood(id) {
           parse_mode: 'Markdown'
         });
       }
-      return;
+    } else {
+      this.createFoodList(header, exactum, (res) => {
+        for (var j = 0; j < groups.length; j++) {
+          bot.sendMessage(groups[j], res.trim(), {
+            parse_mode: 'Markdown'
+          });
+        }
+      });
     }
-    this.createFoodList(header, exactum, (res) => {
-      for (var j = 0; j < groups.length; j++) {
-        bot.sendMessage(groups[j], res.trim(), {
-          parse_mode: 'Markdown'
-        });
-      }
-    });
 
     var header = '*Päivän ruoka:* \n\n*UniCafe Chemicum:* \n\n'
     if (err) return
@@ -171,15 +171,15 @@ function todaysFood(id) {
           parse_mode: 'Markdown'
         });
       }
-      return;
+    } else {
+      this.createFoodList(header, chemicum, (res) => {
+        for (var j = 0; j < groups.length; j++) {
+          bot.sendMessage(groups[j], res.trim(), {
+            parse_mode: 'Markdown'
+          })
+        }
+      })
     }
-    this.createFoodList(header, chemicum, (res) => {
-      for (var j = 0; j < groups.length; j++) {
-        bot.sendMessage(groups[j], res.trim(), {
-          parse_mode: 'Markdown'
-        })
-      }
-    })
   })
 }
 
@@ -200,6 +200,10 @@ function weather() {
       })
     }
   })
+}
+
+if (process.argv.indexOf('pfl') > -1) {
+  todaysFood();
 }
 
 cron.schedule('0 0 7 * * *', () => {
