@@ -11,8 +11,10 @@ const translations = require('./translations')
 var EVENTS_FILE = 'events.json'
 var GROUPS_FILE = 'groups.json'
 
-const FOODLIST_URL = 'http://62.78.194.51/unicafe/food'
 const WEATHER_URL = 'https://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20woeid%20in%20(select%20woeid%20from%20geo.places(1)%20where%20text%3D%22helsinki%22)%20and%20u=%27c%27&format=json&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys'
+
+const FoodlistService = require('./services/FoodlistService');
+const foodlistService = new FoodlistService();
 
 moment.locale('fi')
 
@@ -142,18 +144,17 @@ function todaysFood(id) {
     cb(res + edullisesti + maukkaasti + makeasti + footer)
   }
 
-  request.get(FOODLIST_URL, (err, res, body) => {
-    var header = '*Päivän ruoka:* \n\n*UniCafe Exactum:* \n\n'
-    if (err) return
-    let exactum = JSON.parse(body).exactum;
-    if (!exactum.length) {
+  foodlistService.fetchRestaurantFoodlist('exactum', list => {
+    var header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
+    if (!list) return
+    if (!list.length) {
       for (var j = 0; j < groups.length; j++) {
         bot.sendMessage(groups[j], header + 'ei ruokaa 😭😭😭'.trim(), {
           parse_mode: 'Markdown'
         });
       }
     } else {
-      this.createFoodList(header, exactum, (res) => {
+      this.createFoodList(header, list, (res) => {
         for (var j = 0; j < groups.length; j++) {
           bot.sendMessage(groups[j], res.trim(), {
             parse_mode: 'Markdown'
@@ -161,24 +162,26 @@ function todaysFood(id) {
         }
       });
     }
+  })
 
-    var header = '*Päivän ruoka:* \n\n*UniCafe Chemicum:* \n\n'
-    if (err) return
-    let chemicum = JSON.parse(body).chemicum;
-    if (!chemicum.length) {
+
+  foodlistService.fetchRestaurantFoodlist('chemicum', list => {
+    var header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
+    if (!list) return
+    if (!list.length) {
       for (var j = 0; j < groups.length; j++) {
         bot.sendMessage(groups[j], header + 'ei ruokaa 😭😭😭'.trim(), {
           parse_mode: 'Markdown'
         });
       }
     } else {
-      this.createFoodList(header, chemicum, (res) => {
+      this.createFoodList(header, list, (res) => {
         for (var j = 0; j < groups.length; j++) {
           bot.sendMessage(groups[j], res.trim(), {
             parse_mode: 'Markdown'
-          })
+          });
         }
-      })
+      });
     }
   })
 }
