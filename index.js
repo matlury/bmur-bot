@@ -66,9 +66,15 @@ function getEventURL(id) {
   return 'http://tko-aly.fi/event/' + id
 }
 
-function makeHumanReadable(dateFormat) {
+function makeEventHumanReadable(dateFormat) {
   return function (e) {
     return moment(e.starts).format(dateFormat) + ': [' + e.name.trim() + '](' + getEventURL(e.id) + ')'
+  }
+}
+
+function makeRegistHumanReadable(dateFormat) {
+  return function (e) {
+    return 'Ilmo aukeaa ' + moment(e.registration_starts).format(dateFormat) + ': [' + e.name.trim() + '](' + getEventURL(e.id) + ')'
   }
 }
 
@@ -76,9 +82,14 @@ function retrieveEvents(cb) {
   tkoalyevents(cb)
 }
 
-function listEvents(events, dateFormat) {
+function listEvents(events, dateFormat, showRegistTimes) {
+  var data = []
+  if (showRegistTimes) {
+    data = events.map(makeRegistHumanReadable(dateFormat))
+  } else {
+    data = events.map(makeEventHumanReadable(dateFormat))
+  }
   var res = ''
-  var data = events.map(makeHumanReadable(dateFormat))
   for (var i = 0; i < data.length; i++) {
     var event = data[i]
     res += event + '\n'
@@ -88,12 +99,13 @@ function listEvents(events, dateFormat) {
 
 function todaysEvents() {
   var today = moment()
-  var data = events.filter(e => moment(e.starts).isSame(today, 'day'))
-  if (data && data.length > 0) {
-    data = listEvents(data, 'HH:mm')
-    var res = '*Tänään:* \n' + data
+  var eventsToday = events.filter(e => moment(e.starts).isSame(today, 'day'))
+  var registsToday = events.filter(e => moment(e.registration_starts).isSame(today, 'day'))
+  
+  if ((eventsToday && eventsToday.length > 0) || (registsToday && registsToday.length > 0)) {
+    var message = '*Tänään:* \n' + listEvents(eventsToday, 'HH:mm') + listEvents(registsToday, 'HH:mm', true)
     for (var j = 0; j < groups.length; j++) {
-      bot.sendMessage(groups[j], res.trim(), {
+      bot.sendMessage(groups[j], message.trim(), {
         disable_web_page_preview: true,
         parse_mode: 'Markdown'
       })
