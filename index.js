@@ -123,7 +123,7 @@ function newEvents(events) {
   } else {
     res = '*Uusi tapahtuma:* \n'
   }
-  res += listEvents(events)
+  res += listEvents(events, 'DD.MM.YYYY HH:mm')
   for (var j = 0; j < groups.length; j++) {
     bot.sendMessage(groups[j], res.trim(), {
       disable_web_page_preview: true,
