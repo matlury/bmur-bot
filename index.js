@@ -1,11 +1,11 @@
 require('dotenv').config()
-var TelegramBot = require('node-telegram-bot-api')
-var fs = require('fs')
-var moment = require('moment')
-var cron = require('node-cron')
-var tkoalyevents = require('tkoalyevents')
-var R = require('ramda')
-var request = require('request')
+const TelegramBot = require('node-telegram-bot-api')
+const fs = require('fs')
+const moment = require('moment')
+const cron = require('node-cron')
+const tkoalyevents = require('tkoalyevents')
+const R = require('ramda')
+const request = require('request')
 const translations = require('./translations')
 
 var EVENTS_FILE = 'events.json'
