@@ -9,7 +9,6 @@ var request = require('request')
 const translations = require('./translations')
 
 var EVENTS_FILE = 'events.json'
-var GROUPS_FILE = 'groups.json'
 
 const WEATHER_URL = 'https://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20woeid%20in%20(select%20woeid%20from%20geo.places(1)%20where%20text%3D%22helsinki%22)%20and%20u=%27c%27&format=json&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys'
 
@@ -26,20 +25,11 @@ if (!process.env.API_TOKEN) {
 var bot = new TelegramBot(process.env.API_TOKEN, { polling: true })
 
 var events = []
-var groups = [224942920]
 fs.readFile(EVENTS_FILE, (err, eventsData) => {
   if (!err) {
     events = JSON.parse(eventsData)
     console.log('read', events.length, 'events')
   }
-  fs.readFile(GROUPS_FILE, (err, groupsData) => {
-    if (!err) {
-      groups = JSON.parse(groupsData)
-      console.log('read', groups.length, 'groups')
-    }
-    setTimeout(pollEvents, 1000)
-    setInterval(pollEvents, 15 * 60 * 1000)
-  })
 })
 
 function saveEvents(data, cb) {
@@ -104,12 +94,7 @@ function todaysEvents() {
   
   if ((eventsToday && eventsToday.length > 0) || (registsToday && registsToday.length > 0)) {
     var message = '*Tänään:* \n' + listEvents(eventsToday, 'HH:mm') + listEvents(registsToday, 'HH:mm', true)
-    for (var j = 0; j < groups.length; j++) {
-      bot.sendMessage(groups[j], message.trim(), {
-        disable_web_page_preview: true,
-        parse_mode: 'Markdown'
-      })
-    }
+    broadcastMessage(message.trim(), true)
   }
 }
 
@@ -124,12 +109,7 @@ function newEvents(events) {
     res = '*Uusi tapahtuma:* \n'
   }
   res += listEvents(events, 'DD.MM.YYYY HH:mm')
-  for (var j = 0; j < groups.length; j++) {
-    bot.sendMessage(groups[j], res.trim(), {
-      disable_web_page_preview: true,
-      parse_mode: 'Markdown'
-    })
-  }
+  broadcastMessage(res.trim(), true)
 }
 
 function todaysFood(id) {
@@ -160,18 +140,11 @@ function todaysFood(id) {
     var header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list) return
     if (!list.length) {
-      for (var j = 0; j < groups.length; j++) {
-        bot.sendMessage(groups[j], header + 'ei ruokaa 😭😭😭'.trim(), {
-          parse_mode: 'Markdown'
-        });
-      }
+      broadcastMessage(header + 'ei ruokaa 😭😭😭'.trim())
     } else {
+      broadcastMessage()
       this.createFoodList(header, list, (res) => {
-        for (var j = 0; j < groups.length; j++) {
-          bot.sendMessage(groups[j], res.trim(), {
-            parse_mode: 'Markdown'
-          });
-        }
+        broadcastMessage(res.trim())
       });
     }
   })
@@ -181,18 +154,10 @@ function todaysFood(id) {
     var header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list) return
     if (!list.length) {
-      for (var j = 0; j < groups.length; j++) {
-        bot.sendMessage(groups[j], header + 'ei ruokaa 😭😭😭'.trim(), {
-          parse_mode: 'Markdown'
-        });
-      }
+      broadcastMessage(header + 'ei ruokaa 😭😭😭'.trim())
     } else {
       this.createFoodList(header, list, (res) => {
-        for (var j = 0; j < groups.length; j++) {
-          bot.sendMessage(groups[j], res.trim(), {
-            parse_mode: 'Markdown'
-          });
-        }
+        broadcastMessage(res.trim())
       });
     }
   })
@@ -209,11 +174,7 @@ function weather() {
     var resStr = `*Lämpötila on Helsingissä ${obj.item.condition.temp}°C,  ${translations.conditions[obj.item.condition.code]} ${translations.emoji[obj.item.condition.code]} . `
     resStr += `Aurinko ${moment().isBefore(moment(obj.astronomy.sunrise, ['h:mm A'])) ? 'nousee' : 'nousi'} ${moment(obj.astronomy.sunrise, ["h:mm A"]).format('HH:mm')} ja laskee ${moment(obj.astronomy.sunset, ["h:mm A"]).format('HH:mm')}.*`
 
-    for (var g of groups) {
-      bot.sendMessage(g, resStr.trim(), {
-        parse_mode: 'Markdown'
-      })
-    }
+    broadcastMessage(resStr.trim())
   })
 }
 
@@ -228,10 +189,10 @@ cron.schedule('0 0 7 * * *', () => {
 
 cron.schedule('0 0 10 * * 1-5', todaysFood)
 
-bot.on('message', function (msg) {
-  if (msg.chat.type !== 'private' && groups.indexOf(msg.chat.id) === -1) {
-    console.log('Found a new group:', msg.chat.id, msg.chat.title)
-    groups.push(msg.chat.id)
-    fs.writeFile(GROUPS_FILE, JSON.stringify(groups))
-  }
-})
+function broadcastMessage(message, disableWebPagePreview) {
+  if (!message) return
+  return bot.sendMessage(process.env.TELEGRAM_BROADCAST_CHANNEL_ID, message, {
+    parse_mode: 'Markdown',
+    disable_web_page_preview: !!disableWebPagePreview
+  })
+}
