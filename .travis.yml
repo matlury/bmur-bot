@@ -10,4 +10,4 @@ deploy:
   provider: script
   script: bash ./scripts/deploy_container.sh
   on:
-    feature/send-to-tg-channel
+    master
