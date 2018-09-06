@@ -1,4 +1,5 @@
 #!/bin/bash
+set -ex
 echo "Pushing container image to registry.tko-aly.fi"
 docker login registry.tko-aly.fi --username $DEPLOY_USERNAME --password $DEPLOY_PASSWORD
 docker build . -t eventbird-tg
