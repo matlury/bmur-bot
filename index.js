@@ -1,20 +1,17 @@
 require('dotenv').config()
-var TelegramBot = require('node-telegram-bot-api')
-var fs = require('fs')
-var moment = require('moment')
-var cron = require('node-cron')
-var tkoalyevents = require('tkoalyevents')
-var R = require('ramda')
-var request = require('request')
+const TelegramBot = require('node-telegram-bot-api')
+const fs = require('fs')
+const moment = require('moment')
+const cron = require('node-cron')
+const tkoalyevents = require('tkoalyevents')
+const R = require('ramda')
+const request = require('request-promise')
 const translations = require('./translations')
+const fetchRestaurantFoodlist = require('./services/FoodlistService')
 
-var EVENTS_FILE = 'events.json'
-var GROUPS_FILE = 'groups.json'
+const EVENTS_FILE = 'events.json'
 
 const WEATHER_URL = 'https://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20woeid%20in%20(select%20woeid%20from%20geo.places(1)%20where%20text%3D%22helsinki%22)%20and%20u=%27c%27&format=json&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys'
-
-const FoodlistService = require('./services/FoodlistService');
-const foodlistService = new FoodlistService();
 
 moment.locale('fi')
 
@@ -26,24 +23,16 @@ if (!process.env.API_TOKEN) {
 var bot = new TelegramBot(process.env.API_TOKEN, { polling: true })
 
 var events = []
-var groups = [224942920]
 fs.readFile(EVENTS_FILE, (err, eventsData) => {
   if (!err) {
     events = JSON.parse(eventsData)
     console.log('read', events.length, 'events')
   }
-  fs.readFile(GROUPS_FILE, (err, groupsData) => {
-    if (!err) {
-      groups = JSON.parse(groupsData)
-      console.log('read', groups.length, 'groups')
-    }
-    setTimeout(pollEvents, 1000)
-    setInterval(pollEvents, 15 * 60 * 1000)
-  })
 })
 
 function saveEvents(data, cb) {
   fs.writeFile(EVENTS_FILE, JSON.stringify(data), cb)
+  return data
 }
 
 function eventDifference(data, events) {
@@ -52,13 +41,14 @@ function eventDifference(data, events) {
 }
 
 function pollEvents() {
-  retrieveEvents(function (data) {
-    saveEvents(data)
-    var difference = eventDifference(data, events)
-    if (difference && difference.length > 0) {
-      newEvents(difference)
-    }
-    events = data
+  retrieveEvents()
+    .then(saveEvents)
+    .then(data => {
+      var difference = eventDifference(data, events)
+      if (difference && difference.length > 0) {
+        newEvents(difference)
+      }
+      events = data
   })
 }
 
@@ -79,7 +69,9 @@ function makeRegistHumanReadable(dateFormat) {
 }
 
 function retrieveEvents(cb) {
-  tkoalyevents(cb)
+  return new Promise((resolve, reject) => {
+    tkoalyevents(resolve)
+  })
 }
 
 function listEvents(events, dateFormat, showRegistTimes) {
@@ -104,12 +96,7 @@ function todaysEvents() {
   
   if ((eventsToday && eventsToday.length > 0) || (registsToday && registsToday.length > 0)) {
     var message = '*Tänään:* \n' + listEvents(eventsToday, 'HH:mm') + listEvents(registsToday, 'HH:mm', true)
-    for (var j = 0; j < groups.length; j++) {
-      bot.sendMessage(groups[j], message.trim(), {
-        disable_web_page_preview: true,
-        parse_mode: 'Markdown'
-      })
-    }
+    broadcastMessage(message.trim(), true)
   }
 }
 
@@ -124,16 +111,11 @@ function newEvents(events) {
     res = '*Uusi tapahtuma:* \n'
   }
   res += listEvents(events, 'DD.MM.YYYY HH:mm')
-  for (var j = 0; j < groups.length; j++) {
-    bot.sendMessage(groups[j], res.trim(), {
-      disable_web_page_preview: true,
-      parse_mode: 'Markdown'
-    })
-  }
+  broadcastMessage(res.trim(), true)
 }
 
 function todaysFood(id) {
-  this.createFoodList = (str, array, cb) => {
+  this.createFoodList = (str, array) => {
     var res = str
     var edullisesti = '*Edullisesti:* \n'
     var makeasti = '*Makeasti:*\n'
@@ -153,68 +135,51 @@ function todaysFood(id) {
       }
     }
     let footer = '\n[Äänestä suosikkia!](https://kumpulafood.herokuapp.com)'
-    cb(res + edullisesti + maukkaasti + makeasti + footer)
+    return res + edullisesti + maukkaasti + makeasti + footer
   }
 
-  foodlistService.fetchRestaurantFoodlist('exactum', list => {
+  fetchRestaurantFoodlist('exactum').then(list => {
     var header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list) return
     if (!list.length) {
-      for (var j = 0; j < groups.length; j++) {
-        bot.sendMessage(groups[j], header + 'ei ruokaa 😭😭😭'.trim(), {
-          parse_mode: 'Markdown'
-        });
-      }
+      broadcastMessage(header + 'ei ruokaa 😭😭😭'.trim())
     } else {
-      this.createFoodList(header, list, (res) => {
-        for (var j = 0; j < groups.length; j++) {
-          bot.sendMessage(groups[j], res.trim(), {
-            parse_mode: 'Markdown'
-          });
-        }
-      });
+      const foodList = this.createFoodList(header,list)
+      broadcastMessage(foodList)
     }
   })
+  .catch(err => console.error(err))
 
 
-  foodlistService.fetchRestaurantFoodlist('chemicum', list => {
+  fetchRestaurantFoodlist('chemicum').then(list => {
     var header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list) return
     if (!list.length) {
-      for (var j = 0; j < groups.length; j++) {
-        bot.sendMessage(groups[j], header + 'ei ruokaa 😭😭😭'.trim(), {
-          parse_mode: 'Markdown'
-        });
-      }
+      broadcastMessage(header + 'ei ruokaa 😭😭😭'.trim())
     } else {
-      this.createFoodList(header, list, (res) => {
-        for (var j = 0; j < groups.length; j++) {
-          bot.sendMessage(groups[j], res.trim(), {
-            parse_mode: 'Markdown'
-          });
-        }
-      });
+      const foodList = this.createFoodList(header,list)
+      broadcastMessage(foodList)
     }
   })
+  .catch(err => console.error(err))
+}
+
+function createWeatherString(body) {
+  var obj = JSON.parse(body).query.results.channel
+
+  let sunrise = moment(obj.astronomy.sunrise, ["h:mm A"])
+  let sunset = moment(obj.astronomy.sunset, ["h:mm A"])
+
+  var resStr = `*Lämpötila on Helsingissä ${obj.item.condition.temp}°C,  ${translations.conditions[obj.item.condition.code]} ${translations.emoji[obj.item.condition.code]} . `
+  resStr += `Aurinko ${moment().isBefore(moment(obj.astronomy.sunrise, ['h:mm A'])) ? 'nousee' : 'nousi'} ${moment(obj.astronomy.sunrise, ["h:mm A"]).format('HH:mm')} ja laskee ${moment(obj.astronomy.sunset, ["h:mm A"]).format('HH:mm')}.*`
+  return resStr.trim()
 }
 
 function weather() {
-  request.get(WEATHER_URL, (err, res, body) => {
-    if (err) return
-    var obj = JSON.parse(body).query.results.channel
-
-    let sunrise = moment(obj.astronomy.sunrise, ["h:mm A"])
-    let sunset = moment(obj.astronomy.sunset, ["h:mm A"])
-
-    var resStr = `*Lämpötila on Helsingissä ${obj.item.condition.temp}°C,  ${translations.conditions[obj.item.condition.code]} ${translations.emoji[obj.item.condition.code]} . `
-    resStr += `Aurinko ${moment().isBefore(moment(obj.astronomy.sunrise, ['h:mm A'])) ? 'nousee' : 'nousi'} ${moment(obj.astronomy.sunrise, ["h:mm A"]).format('HH:mm')} ja laskee ${moment(obj.astronomy.sunset, ["h:mm A"]).format('HH:mm')}.*`
-
-    for (var g of groups) {
-      bot.sendMessage(g, resStr.trim(), {
-        parse_mode: 'Markdown'
-      })
-    }
-  })
+  request.get(WEATHER_URL)
+    .then(createWeatherString)
+    .then(broadcastMessage)
+    .catch(err => console.log(err))
 }
 
 if (process.argv.indexOf('pfl') > -1) {
@@ -226,12 +191,16 @@ cron.schedule('0 0 7 * * *', () => {
   weather()
 })
 
+todaysEvents()
+todaysFood()
+weather()
+
 cron.schedule('0 0 10 * * 1-5', todaysFood)
 
-bot.on('message', function (msg) {
-  if (msg.chat.type !== 'private' && groups.indexOf(msg.chat.id) === -1) {
-    console.log('Found a new group:', msg.chat.id, msg.chat.title)
-    groups.push(msg.chat.id)
-    fs.writeFile(GROUPS_FILE, JSON.stringify(groups))
-  }
-})
+function broadcastMessage(message, disableWebPagePreview) {
+  if (!message) return
+  return bot.sendMessage(process.env.TELEGRAM_BROADCAST_CHANNEL_ID, message, {
+    parse_mode: 'Markdown',
+    disable_web_page_preview: !!disableWebPagePreview
+  })
+}
