@@ -32,9 +32,6 @@ fs.readFile(EVENTS_FILE, (err, eventsData) => {
   }
 })
 
-setTimeout(pollEvents, 1000)
-setInterval(pollEvents, 15 * 60 * 1000)
-
 function saveEvents(data, cb) {
   fs.writeFile(EVENTS_FILE, JSON.stringify(data), cb)
   return data
