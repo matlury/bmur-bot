@@ -191,10 +191,6 @@ cron.schedule('0 0 7 * * *', () => {
   weather()
 })
 
-todaysEvents()
-todaysFood()
-weather()
-
 cron.schedule('0 0 10 * * 1-5', todaysFood)
 
 function broadcastMessage(message, disableWebPagePreview) {
