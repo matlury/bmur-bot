@@ -5,15 +5,13 @@ const moment = require('moment')
 const cron = require('node-cron')
 const tkoalyevents = require('tkoalyevents')
 const R = require('ramda')
-const request = require('request')
+const request = require('request-promise')
 const translations = require('./translations')
+const fetchRestaurantFoodlist = require('./services/FoodlistService')
 
 const EVENTS_FILE = 'events.json'
 
 const WEATHER_URL = 'https://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20woeid%20in%20(select%20woeid%20from%20geo.places(1)%20where%20text%3D%22helsinki%22)%20and%20u=%27c%27&format=json&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys'
-
-const FoodlistService = require('./services/FoodlistService');
-const foodlistService = new FoodlistService();
 
 moment.locale('fi')
 
@@ -34,6 +32,7 @@ fs.readFile(EVENTS_FILE, (err, eventsData) => {
 
 function saveEvents(data, cb) {
   fs.writeFile(EVENTS_FILE, JSON.stringify(data), cb)
+  return data
 }
 
 function eventDifference(data, events) {
@@ -42,13 +41,14 @@ function eventDifference(data, events) {
 }
 
 function pollEvents() {
-  retrieveEvents(function (data) {
-    saveEvents(data)
-    var difference = eventDifference(data, events)
-    if (difference && difference.length > 0) {
-      newEvents(difference)
-    }
-    events = data
+  retrieveEvents()
+    .then(saveEvents)
+    .then(data => {
+      var difference = eventDifference(data, events)
+      if (difference && difference.length > 0) {
+        newEvents(difference)
+      }
+      events = data
   })
 }
 
@@ -69,7 +69,9 @@ function makeRegistHumanReadable(dateFormat) {
 }
 
 function retrieveEvents(cb) {
-  tkoalyevents(cb)
+  return new Promise((resolve, reject) => {
+    tkoalyevents(resolve)
+  })
 }
 
 function listEvents(events, dateFormat, showRegistTimes) {
@@ -113,7 +115,7 @@ function newEvents(events) {
 }
 
 function todaysFood(id) {
-  this.createFoodList = (str, array, cb) => {
+  this.createFoodList = (str, array) => {
     var res = str
     var edullisesti = '*Edullisesti:* \n'
     var makeasti = '*Makeasti:*\n'
@@ -133,49 +135,51 @@ function todaysFood(id) {
       }
     }
     let footer = '\n[Äänestä suosikkia!](https://kumpulafood.herokuapp.com)'
-    cb(res + edullisesti + maukkaasti + makeasti + footer)
+    return res + edullisesti + maukkaasti + makeasti + footer
   }
 
-  foodlistService.fetchRestaurantFoodlist('exactum', list => {
+  fetchRestaurantFoodlist('exactum').then(list => {
     var header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list) return
     if (!list.length) {
       broadcastMessage(header + 'ei ruokaa 😭😭😭'.trim())
     } else {
-      broadcastMessage()
-      this.createFoodList(header, list, (res) => {
-        broadcastMessage(res.trim())
-      });
+      const foodList = this.createFoodList(header,list)
+      broadcastMessage(foodList)
     }
   })
+  .catch(err => console.error(err))
 
 
-  foodlistService.fetchRestaurantFoodlist('chemicum', list => {
+  fetchRestaurantFoodlist('chemicum').then(list => {
     var header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list) return
     if (!list.length) {
       broadcastMessage(header + 'ei ruokaa 😭😭😭'.trim())
     } else {
-      this.createFoodList(header, list, (res) => {
-        broadcastMessage(res.trim())
-      });
+      const foodList = this.createFoodList(header,list)
+      broadcastMessage(foodList)
     }
   })
+  .catch(err => console.error(err))
+}
+
+function createWeatherString(body) {
+  var obj = JSON.parse(body).query.results.channel
+
+  let sunrise = moment(obj.astronomy.sunrise, ["h:mm A"])
+  let sunset = moment(obj.astronomy.sunset, ["h:mm A"])
+
+  var resStr = `*Lämpötila on Helsingissä ${obj.item.condition.temp}°C,  ${translations.conditions[obj.item.condition.code]} ${translations.emoji[obj.item.condition.code]} . `
+  resStr += `Aurinko ${moment().isBefore(moment(obj.astronomy.sunrise, ['h:mm A'])) ? 'nousee' : 'nousi'} ${moment(obj.astronomy.sunrise, ["h:mm A"]).format('HH:mm')} ja laskee ${moment(obj.astronomy.sunset, ["h:mm A"]).format('HH:mm')}.*`
+  return resStr.trim()
 }
 
 function weather() {
-  request.get(WEATHER_URL, (err, res, body) => {
-    if (err) return
-    var obj = JSON.parse(body).query.results.channel
-
-    let sunrise = moment(obj.astronomy.sunrise, ["h:mm A"])
-    let sunset = moment(obj.astronomy.sunset, ["h:mm A"])
-
-    var resStr = `*Lämpötila on Helsingissä ${obj.item.condition.temp}°C,  ${translations.conditions[obj.item.condition.code]} ${translations.emoji[obj.item.condition.code]} . `
-    resStr += `Aurinko ${moment().isBefore(moment(obj.astronomy.sunrise, ['h:mm A'])) ? 'nousee' : 'nousi'} ${moment(obj.astronomy.sunrise, ["h:mm A"]).format('HH:mm')} ja laskee ${moment(obj.astronomy.sunset, ["h:mm A"]).format('HH:mm')}.*`
-
-    broadcastMessage(resStr.trim())
-  })
+  request.get(WEATHER_URL)
+    .then(createWeatherString)
+    .then(broadcastMessage)
+    .catch(err => console.log(err))
 }
 
 if (process.argv.indexOf('pfl') > -1) {
@@ -186,6 +190,10 @@ cron.schedule('0 0 7 * * *', () => {
   todaysEvents()
   weather()
 })
+
+todaysEvents()
+todaysFood()
+weather()
 
 cron.schedule('0 0 10 * * 1-5', todaysFood)
 
