@@ -27,8 +27,13 @@ fs.readFile(EVENTS_FILE, (err, eventsData) => {
   if (!err) {
     events = JSON.parse(eventsData)
     console.log('read', events.length, 'events')
+    setTimeout(pollEvents, 1000)
+    setInterval(pollEvents, 15 * 60 * 1000)
   }
 })
+
+setTimeout(pollEvents, 1000)
+setInterval(pollEvents, 15 * 60 * 1000)
 
 function saveEvents(data, cb) {
   fs.writeFile(EVENTS_FILE, JSON.stringify(data), cb)
@@ -41,6 +46,7 @@ function eventDifference(data, events) {
 }
 
 function pollEvents() {
+  console.log('polling events...')
   retrieveEvents()
     .then(saveEvents)
     .then(data => {
