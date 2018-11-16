@@ -145,10 +145,10 @@ function todaysFood(id) {
     var header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list) return
     if (!list.length) {
-      broadcastMessage(header + 'ei ruokaa 😭😭😭'.trim())
+      broadcastToDaily(header + 'ei ruokaa 😭😭😭'.trim())
     } else {
       const foodList = this.createFoodList(header,list)
-      broadcastMessage(foodList)
+      broadcastToDaily(foodList)
     }
   })
   .catch(err => console.error(err))
@@ -158,10 +158,10 @@ function todaysFood(id) {
     var header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list) return
     if (!list.length) {
-      broadcastMessage(header + 'ei ruokaa 😭😭😭'.trim())
+      broadcastToDaily(header + 'ei ruokaa 😭😭😭'.trim())
     } else {
       const foodList = this.createFoodList(header,list)
-      broadcastMessage(foodList)
+      broadcastToDaily(foodList)
     }
   })
   .catch(err => console.error(err))
@@ -181,7 +181,7 @@ function createWeatherString(body) {
 function weather() {
   request.get(WEATHER_URL)
     .then(createWeatherString)
-    .then(broadcastMessage)
+    .then(broadcastToDaily)
     .catch(err => console.log(err))
 }
 
@@ -198,7 +198,15 @@ cron.schedule('0 0 10 * * 1-5', todaysFood)
 
 function broadcastMessage(message, disableWebPagePreview) {
   if (!message) return
-  return bot.sendMessage(process.env.TELEGRAM_BROADCAST_CHANNEL_ID, message, {
+  return bot.sendMessage(process.env.TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID, message, {
+    parse_mode: 'Markdown',
+    disable_web_page_preview: !!disableWebPagePreview
+  })
+}
+
+function broadcastToDaily(message, disableWebPagePreview) {
+  if (!message) return
+  return bot.sendMessage(process.env.TELEGRAM_DAILY_BROADCAST_CHANNEL_ID, message, {
     parse_mode: 'Markdown',
     disable_web_page_preview: !!disableWebPagePreview
   })
