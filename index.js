@@ -189,6 +189,10 @@ if (process.argv.indexOf('pfl') > -1) {
   todaysFood();
 }
 
+if (process.argv.includes('pte')) {
+  todaysEvents()
+}
+
 cron.schedule('0 0 7 * * *', () => {
   todaysEvents()
   weather()
