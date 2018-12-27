@@ -3,7 +3,6 @@ const TelegramBot = require('node-telegram-bot-api')
 const fs = require('fs')
 const moment = require('moment')
 const cron = require('node-cron')
-const tkoalyevents = require('tkoalyevents')
 const R = require('ramda')
 const request = require('request-promise')
 const translations = require('./translations')
@@ -33,7 +32,7 @@ fs.readFile(EVENTS_FILE, (err, eventsData) => {
 })
 
 function saveEvents(data, cb) {
-  fs.writeFile(EVENTS_FILE, JSON.stringify(data), cb)
+  fs.writeFileSync(EVENTS_FILE, JSON.stringify(data))
   return data
 }
 
@@ -72,9 +71,21 @@ function makeRegistHumanReadable(dateFormat) {
 }
 
 function retrieveEvents(cb) {
-  return new Promise((resolve, reject) => {
-    tkoalyevents(resolve)
-  })
+  const opts = {
+    headers: {
+      'X-Token': process.env.EVENT_API_TOKEN
+    }
+  }
+
+  return request
+    .get('https://members.tko-aly.fi/api/events?fromDate=' + moment(Date.now() + (1000 * 60 * 60 * 2)).toISOString(), opts)
+    .then(JSON.parse)
+    .then(filterDeletedEvents)
+
+}
+
+function filterDeletedEvents(events) {
+  return events.filter(e => e.deleted === 0)
 }
 
 function listEvents(events, dateFormat, showRegistTimes) {
