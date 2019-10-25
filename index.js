@@ -151,7 +151,7 @@ function todaysFood(id) {
         createFoodList,
         list => `${header} ${list}`,
         broadcastToDaily
-      )(lilist.foodList)
+      )(list.foodList)
     }
   })
   .catch(err => console.error(err))

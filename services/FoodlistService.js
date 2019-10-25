@@ -1,6 +1,7 @@
 const request = require('request-promise')
 const fi = require('date-fns/locale/fi')
 const { format } = require('date-fns')
+const R = require('ramda')
 
 const restaurants = {
   'chemicum': 10,
@@ -13,10 +14,10 @@ const restaurants = {
 function parseFoodlistData({ data, information }) {
   const now = new Date();
   const unicafeFormat = format(now, 'EEEEEE dd.MM', { locale: fi })
-  const foodList = data
-    .filter(({ date }) => date.toLowerCase() === unicafeFormat)
-    .flatMap(({ data }) => data)
-    .map(({ name, price, nutrition, ingredients, meta }) => ({
+  const foodList = R.pipe(
+    R.filter(({ date }) => date.toLowerCase() === unicafeFormat),
+    R.chain(({ data }) => data),
+    R.map(({ name, price, nutrition, ingredients, meta }) => ({
       name: name,
       price: {
         student: price.value.student,
@@ -29,6 +30,7 @@ function parseFoodlistData({ data, information }) {
       ingredients: ingredients,
       warnings: meta["1"]
     }))
+  )(data)
   return {
     restaurantName: information.restaurant,
     foodList
