@@ -128,51 +128,47 @@ function newEvents(events) {
   broadcastMessage(res.trim(), true)
 }
 
-function todaysFood(id) {
-  this.createFoodList = (str, array) => {
-    var res = str
-    var edullisesti = '*Edullisesti:* \n'
-    var makeasti = '*Makeasti:*\n'
-    var maukkaasti = '*Maukkaasti:*\n'
-    for (var i of array) {
-      switch (i.price.name) {
-        case 'Edullisesti':
-          // Kaunista...
-          edullisesti += `  -  ${i.name} ${i.warnings.length !== 0 ? '_(' : ''}${i.warnings.join(', ')}${i.warnings.length !== 0 ? ')_' : ''} \n\n`
-          break
-        case 'Makeasti':
-          makeasti += `  -  ${i.name} ${i.warnings.length !== 0 ? '_(' : ''}${i.warnings.join(', ')}${i.warnings.length !== 0 ? ')_' : ''} \n\n`
-          break
-        case 'Maukkaasti':
-          maukkaasti += `  -  ${i.name} ${i.warnings.length !== 0 ? '_(' : ''}${i.warnings.join(', ')}${i.warnings.length !== 0 ? ')_' : ''} \n\n`
-          break
-      }
-    }
-    let footer = '\n[Äänestä suosikkia!](https://kumpulafood.herokuapp.com)'
-    return res + edullisesti + maukkaasti + makeasti + footer
-  }
+const createFoodList = groupedList => {
+  const keys = R.keys(groupedList)
+  return keys
+    .reduce((prev, key) => {
+      const values = groupedList[key]
+      const joinedValues = values
+        .reduce((prev, { name, warnings }) => `${prev}  -  ${name} ${warnings.length !== 0 ? '_(' : ''}${warnings.join(', ')}${warnings.length !== 0 ? ')_' : ''}\n`, '')
+      return `${prev}${key}\n${joinedValues}\n\n`
+  }, '')
+}
 
+function todaysFood(id) {
   fetchRestaurantFoodlist('exactum').then(list => {
-    var header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
-    if (!list) return
-    if (!list.length) {
+    const header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
+    if (!list.foodList) return
+    if (!list.foodList.length) {
       broadcastToDaily(header + 'ei ruokaa 😭😭😭'.trim())
     } else {
-      const foodList = this.createFoodList(header,list)
-      broadcastToDaily(foodList)
+      R.pipe(
+        R.groupBy(({ price }) => price.name),
+        createFoodList,
+        list => `${header} ${list}`,
+        broadcastToDaily
+      )(lilist.foodList)
     }
   })
   .catch(err => console.error(err))
 
 
   fetchRestaurantFoodlist('chemicum').then(list => {
-    var header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
-    if (!list) return
-    if (!list.length) {
+    const header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
+    if (!list.foodList) return
+    if (!list.foodList.length) {
       broadcastToDaily(header + 'ei ruokaa 😭😭😭'.trim())
     } else {
-      const foodList = this.createFoodList(header,list)
-      broadcastToDaily(foodList)
+      R.pipe(
+        R.groupBy(({ price }) => price.name),
+        createFoodList,
+        list => `${header} ${list}`,
+        broadcastToDaily
+      )(list.foodList)
     }
   })
   .catch(err => console.error(err))
@@ -180,9 +176,6 @@ function todaysFood(id) {
 
 function createWeatherString(body) {
   var obj = JSON.parse(body).query.results.channel
-
-  let sunrise = moment(obj.astronomy.sunrise, ["h:mm A"])
-  let sunset = moment(obj.astronomy.sunset, ["h:mm A"])
 
   var resStr = `*Lämpötila on Helsingissä ${obj.item.condition.temp}°C,  ${translations.conditions[obj.item.condition.code]} ${translations.emoji[obj.item.condition.code]} . `
   resStr += `Aurinko ${moment().isBefore(moment(obj.astronomy.sunrise, ['h:mm A'])) ? 'nousee' : 'nousi'} ${moment(obj.astronomy.sunrise, ["h:mm A"]).format('HH:mm')} ja laskee ${moment(obj.astronomy.sunset, ["h:mm A"]).format('HH:mm')}.*`

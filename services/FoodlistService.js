@@ -1,4 +1,6 @@
-const request = require('request-promise');
+const request = require('request-promise')
+const fi = require('date-fns/locale/fi')
+const { format } = require('date-fns')
 
 const restaurants = {
   'chemicum': 10,
@@ -8,41 +10,29 @@ const restaurants = {
 }
 
 
-function parseFoodlistData(body) {
-  let parsedResult = JSON.parse(body);
-  let list = [];
-  var now = new Date();
-  var d = now.getDate() < 10 ? '0' + now.getDate() : '' + now.getDate();
-  d += '.';
-  d += (now.getMonth() + 1) < 10 ? '0' + (now.getMonth() + 1) : '' + (now.getMonth() + 1);
-  var res = {};
-
-  for (var i of parsedResult.data) {
-    if (i.date.split(' ')[1] === d) {
-      for (var i of i.data) {
-        var o = {
-          name: i.name,
-          price: {
-            student: i.price.value.student,
-            graduate: i.price.value.graduate,
-            contract: i.price.value.contract,
-            normal: i.price.value.normal,
-            name: i.price.name
-          },
-          nutrition: i.nutrition,
-          ingredients: i.ingredients,
-          warnings: i.meta["1"]
-        }
-
-        if (o.name.toLowerCase().indexOf('pizza') > -1 && o.warnings.indexOf('rippemahdollisuus') === -1) o.warnings.push('rippemahdollisuus');
-
-        list.push(o);
-
-      }
-    }
+function parseFoodlistData({ data, information }) {
+  const now = new Date();
+  const unicafeFormat = format(now, 'EEEEEE dd.MM', { locale: fi })
+  const foodList = data
+    .filter(({ date }) => date.toLowerCase() === unicafeFormat)
+    .flatMap(({ data }) => data)
+    .map(({ name, price, nutrition, ingredients, meta }) => ({
+      name: name,
+      price: {
+        student: price.value.student,
+        graduate: price.value.graduate,
+        contract: price.value.contract,
+        normal: price.value.normal,
+        name: price.name
+      },
+      nutrition: nutrition,
+      ingredients: ingredients,
+      warnings: meta["1"]
+    }))
+  return {
+    restaurantName: information.restaurant,
+    foodList
   }
-  list.restaurantName = parsedResult.information.restaurant;
-  return list
 }
 
 /**
@@ -54,6 +44,7 @@ function fetchRestaurantFoodlist(restaurant) {
   if (!restaurants[restaurant])
     return Promise.reject('No restaurant found')
   return request.get('http://messi.hyyravintolat.fi/publicapi/restaurant/' + restaurants[restaurant])
+    .then(JSON.parse)
     .then(parseFoodlistData)
 }
 
