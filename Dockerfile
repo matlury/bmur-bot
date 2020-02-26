@@ -10,7 +10,7 @@ COPY yarn.lock ./
 COPY package.json ./
 RUN yarn --dev
 
-COPY services ./test
+COPY services ./services
 COPY index.js ./
 COPY translations.js ./
 
