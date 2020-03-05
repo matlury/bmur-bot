@@ -10,6 +10,7 @@ RUN yarn --dev
 
 COPY services ./services
 COPY index.js ./
+COPY events.json ./
 COPY translations.js ./
 
 CMD ["yarn", "start"]
