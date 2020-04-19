@@ -264,7 +264,7 @@ resource "aws_cloudwatch_event_target" "eventbird_poll_events_event_target" {
     network_configuration {
       assign_public_ip = true
       security_groups  = ["${aws_security_group.eventbird_task_sg.id}"]
-      subnets          = "${data.aws_subnet_ids.private_subnet_ids}"
+      subnets          = data.aws_subnet_ids.private_subnet_ids.ids
     }
   }
 }
@@ -272,7 +272,7 @@ resource "aws_cloudwatch_event_target" "eventbird_poll_events_event_target" {
 resource "aws_cloudwatch_event_rule" "eventbird_todays_events_event" {
   name                = "eventbird-todays-events"
   is_enabled          = true
-  schedule_expression = "cron(0 0 7 * * *)"
+  schedule_expression = "cron(0 7 * * * *)"
 }
 
 resource "aws_cloudwatch_event_target" "eventbird_todays_events_event_target" {
@@ -288,7 +288,7 @@ resource "aws_cloudwatch_event_target" "eventbird_todays_events_event_target" {
     network_configuration {
       assign_public_ip = true
       security_groups  = ["${aws_security_group.eventbird_task_sg.id}"]
-      subnets          = "${data.aws_subnet_ids.private_subnet_ids}"
+      subnets          = data.aws_subnet_ids.private_subnet_ids.ids
     }
   }
 }
@@ -296,7 +296,7 @@ resource "aws_cloudwatch_event_target" "eventbird_todays_events_event_target" {
 resource "aws_cloudwatch_event_rule" "eventbird_todays_food_event" {
   name                = "eventbird-todays-food"
   is_enabled          = true
-  schedule_expression = "cron(0 0 10 * * 1-5)"
+  schedule_expression = "cron(0 4 * * MON-FRI *)"
 }
 
 resource "aws_cloudwatch_event_target" "eventbird_todays_food_event_target" {
@@ -312,7 +312,7 @@ resource "aws_cloudwatch_event_target" "eventbird_todays_food_event_target" {
     network_configuration {
       assign_public_ip = true
       security_groups  = ["${aws_security_group.eventbird_task_sg.id}"]
-      subnets          = "${data.aws_subnet_ids.private_subnet_ids}"
+      subnets          = data.aws_subnet_ids.private_subnet_ids.ids
     }
   }
 }
