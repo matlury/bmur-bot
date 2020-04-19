@@ -35,7 +35,6 @@ data "aws_ssm_parameter" "eventbird_database_url" {
   name = "eventbird-database-url"
 }
 
-
 data "aws_vpc" "tekis_vpc" {
   filter {
     name   = "tag:Name"
@@ -199,7 +198,8 @@ resource "aws_ecs_task_definition" "eventbird_todays_food_task" {
       {"name": "API_TOKEN", "valueFrom": "${data.aws_ssm_parameter.eventbird_api_token.arn}"},
       {"name": "TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID", "valueFrom": "${data.aws_ssm_parameter.eventbird_announcement_channel_id.arn}"},
       {"name": "TELEGRAM_DAILY_BROADCAST_CHANNEL_ID", "valueFrom": "${data.aws_ssm_parameter.eventbird_daily_channel_id.arn}"},
-      {"name": "EVENT_API_TOKEN", "valueFrom": "${data.aws_ssm_parameter.eventbird_event_api_token.arn}"}
+      {"name": "EVENT_API_TOKEN", "valueFrom": "${data.aws_ssm_parameter.eventbird_event_api_token.arn}"},
+      {"name": "DATABASE_URL", "valueFrom": "${data.aws_ssm_parameter.eventbird_database_url.arn}"}
     ]
   }
 ]
@@ -237,7 +237,8 @@ resource "aws_ecs_task_definition" "eventbird_poll_events_task" {
       {"name": "API_TOKEN", "valueFrom": "${data.aws_ssm_parameter.eventbird_api_token.arn}"},
       {"name": "TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID", "valueFrom": "${data.aws_ssm_parameter.eventbird_announcement_channel_id.arn}"},
       {"name": "TELEGRAM_DAILY_BROADCAST_CHANNEL_ID", "valueFrom": "${data.aws_ssm_parameter.eventbird_daily_channel_id.arn}"},
-      {"name": "EVENT_API_TOKEN", "valueFrom": "${data.aws_ssm_parameter.eventbird_event_api_token.arn}"}
+      {"name": "EVENT_API_TOKEN", "valueFrom": "${data.aws_ssm_parameter.eventbird_event_api_token.arn}"},
+      {"name": "DATABASE_URL", "valueFrom": "${data.aws_ssm_parameter.eventbird_database_url.arn}"}
     ]
   }
 ]
@@ -307,7 +308,7 @@ resource "aws_cloudwatch_event_target" "eventbird_todays_food_event_target" {
     launch_type         = "FARGATE"
     task_count          = 1
     task_definition_arn = "${aws_ecs_task_definition.eventbird_todays_food_task.arn}" 
-    
+
     network_configuration {
       assign_public_ip = true
       security_groups  = ["${aws_security_group.eventbird_task_sg.id}"]
