@@ -8,9 +8,7 @@ COPY yarn.lock ./
 COPY package.json ./
 RUN yarn --dev
 
-COPY services ./services
-COPY index.js ./
-COPY events.json ./
-COPY translations.js ./
+COPY src ./
+COPY migrations ./
 
 CMD ["yarn", "start"]

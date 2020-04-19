@@ -1,57 +1,49 @@
-require('dotenv').config({ silent: true })
-const TelegramBot = require('node-telegram-bot-api')
-const fs = require('fs')
+const TelegramBotApi = require('node-telegram-bot-api')
+const { fetchPostedEvents, addNewEvent } = require('./db/eventDb')
 const moment = require('moment')
-const cron = require('node-cron')
 const R = require('ramda')
 const request = require('request-promise')
-const translations = require('./translations')
 const fetchRestaurantFoodlist = require('./services/FoodlistService')
-
-const EVENTS_FILE = 'events.json'
-
-const WEATHER_URL = 'https://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20woeid%20in%20(select%20woeid%20from%20geo.places(1)%20where%20text%3D%22helsinki%22)%20and%20u=%27c%27&format=json&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys'
+const knex = require('knex')
 
 moment.locale('fi')
+knex({
+  client: 'pg',
+  connection: process.env.DATABASE_URL
+})
+  .migrate
+  .latest()
+  .catch(e => {
+    console.error('Unable to migrate database', e)
+    process.exit(1)
+  })
 
 if (!process.env.API_TOKEN) {
   console.error('No api token found.')
   process.exit(1)
 }
 
-var bot = new TelegramBot(process.env.API_TOKEN, { polling: true })
+const telegramApi = new TelegramBotApi(process.env.API_TOKEN)
 
-var events = []
-fs.readFile(EVENTS_FILE, (err, eventsData) => {
-  if (!err) {
-    events = JSON.parse(eventsData)
-    console.log('read', events.length, 'events')
-    setTimeout(pollEvents, 1000)
-    setInterval(pollEvents, 15 * 60 * 1000)
-  }
-})
+const filterPostedEvents = data => 
+  fetchPostedEvents()
+    .then(postedEvents => {
+      const ids = data.map(R.view(R.lensProp('id')))
+      return R.filter(({ id }) => R.difference(ids, postedEvents).includes(id), data)
+    })
 
-function saveEvents(data, cb) {
-  fs.writeFileSync(EVENTS_FILE, JSON.stringify(data))
-  return data
-}
-
-function eventDifference(data, events) {
-  var difference = R.difference(data.map(e => e.id), events.map(e => e.id))
-  return data.filter(e => difference.includes(e.id))
-}
 
 function pollEvents() {
   console.log('polling events...')
-  retrieveEvents()
-    .then(saveEvents)
-    .then(data => {
-      var difference = eventDifference(data, events)
-      if (difference && difference.length > 0) {
-        newEvents(difference)
-      }
-      events = data
-  })
+  return retrieveEvents()
+    .then(filterPostedEvents)
+    .then(
+      R.pipe(
+        R.map(addNewEvent),
+        promises => Promise.all(promises)
+      )
+    )
+    .then(newEvents)
 }
 
 function getEventURL(id) {
@@ -59,18 +51,18 @@ function getEventURL(id) {
 }
 
 function makeEventHumanReadable(dateFormat) {
-  return function (e) {
+  return function(e) {
     return moment(e.starts).format(dateFormat) + ': [' + e.name.trim() + '](' + getEventURL(e.id) + ')'
   }
 }
 
 function makeRegistHumanReadable(dateFormat) {
-  return function (e) {
+  return function(e) {
     return 'Ilmo aukeaa ' + moment(e.registration_starts).format(dateFormat) + ': [' + e.name.trim() + '](' + getEventURL(e.id) + ')'
   }
 }
 
-function retrieveEvents(cb) {
+function retrieveEvents() {
   const opts = {
     headers: {
       'X-Token': process.env.EVENT_API_TOKEN
@@ -81,7 +73,6 @@ function retrieveEvents(cb) {
     .get('https://members.tko-aly.fi/api/events?fromDate=' + moment(Date.now() + (1000 * 60 * 60 * 2)).toISOString(), opts)
     .then(JSON.parse)
     .then(filterDeletedEvents)
-
 }
 
 function filterDeletedEvents(events) {
@@ -103,19 +94,21 @@ function listEvents(events, dateFormat, showRegistTimes) {
   return res
 }
 
-function todaysEvents() {
-  var today = moment()
-  var eventsToday = events.filter(e => moment(e.starts).isSame(today, 'day'))
-  var registsToday = events.filter(e => moment(e.registration_starts).isSame(today, 'day'))
-  
-  if ((eventsToday && eventsToday.length > 0) || (registsToday && registsToday.length > 0)) {
-    var message = '*Tänään:* \n' + listEvents(eventsToday, 'HH:mm') + listEvents(registsToday, 'HH:mm', true)
-    broadcastMessage(message.trim(), true)
-  }
-}
+const todaysEvents = () =>
+  pollEvents()
+    .then(events => {
+      var today = moment()
+      var eventsToday = events.filter(e => moment(e.starts).isSame(today, 'day'))
+      var registsToday = events.filter(e => moment(e.registration_starts).isSame(today, 'day'))
+      
+      if ((eventsToday && eventsToday.length > 0) || (registsToday && registsToday.length > 0)) {
+        var message = '*Tänään:* \n' + listEvents(eventsToday, 'HH:mm') + listEvents(registsToday, 'HH:mm', true)
+        broadcastMessage(message.trim(), true)
+      }
+    })
 
 function newEvents(events) {
-  if (!events) {
+  if (!events || events.length === 0) {
     return
   }
   var res
@@ -156,7 +149,6 @@ function todaysFood(id) {
   })
   .catch(err => console.error(err))
 
-
   fetchRestaurantFoodlist('chemicum').then(list => {
     const header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list.foodList) return
@@ -174,39 +166,13 @@ function todaysFood(id) {
   .catch(err => console.error(err))
 }
 
-function createWeatherString(body) {
-  var obj = JSON.parse(body).query.results.channel
-
-  var resStr = `*Lämpötila on Helsingissä ${obj.item.condition.temp}°C,  ${translations.conditions[obj.item.condition.code]} ${translations.emoji[obj.item.condition.code]} . `
-  resStr += `Aurinko ${moment().isBefore(moment(obj.astronomy.sunrise, ['h:mm A'])) ? 'nousee' : 'nousi'} ${moment(obj.astronomy.sunrise, ["h:mm A"]).format('HH:mm')} ja laskee ${moment(obj.astronomy.sunset, ["h:mm A"]).format('HH:mm')}.*`
-  return resStr.trim()
-}
-
-function weather() {
-  request.get(WEATHER_URL)
-    .then(createWeatherString)
-    .then(broadcastToDaily)
-    .catch(err => console.log(err))
-}
-
-if (process.argv.indexOf('pfl') > -1) {
-  todaysFood();
-}
-
-if (process.argv.includes('pte')) {
-  todaysEvents()
-}
-
-cron.schedule('0 0 7 * * *', () => {
-  todaysEvents()
-  weather()
-})
-
-cron.schedule('0 0 10 * * 1-5', todaysFood)
+process.env.JOB_MODE === 'postFood' && todaysFood()
+process.env.JOB_MODE === 'todaysEvents' && todaysEvents()
+process.env.JOB_MODE === 'pollEvents' && pollEvents()
 
 function broadcastMessage(message, disableWebPagePreview) {
   if (!message) return
-  return bot.sendMessage(process.env.TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID, message, {
+  return telegramApi.sendMessage(process.env.TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID, message, {
     parse_mode: 'Markdown',
     disable_web_page_preview: !!disableWebPagePreview
   })
@@ -214,7 +180,7 @@ function broadcastMessage(message, disableWebPagePreview) {
 
 function broadcastToDaily(message, disableWebPagePreview) {
   if (!message) return
-  return bot.sendMessage(process.env.TELEGRAM_DAILY_BROADCAST_CHANNEL_ID, message, {
+  return telegramApi.sendMessage(process.env.TELEGRAM_DAILY_BROADCAST_CHANNEL_ID, message, {
     parse_mode: 'Markdown',
     disable_web_page_preview: !!disableWebPagePreview
   })
