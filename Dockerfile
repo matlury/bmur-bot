@@ -6,7 +6,7 @@ RUN apk --no-cache add --virtual native-deps \
 WORKDIR /app
 COPY yarn.lock ./
 COPY package.json ./
-RUN yarn --dev
+RUN yarn
 
 COPY src ./
 COPY migrations ./
