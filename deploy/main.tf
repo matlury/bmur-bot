@@ -100,6 +100,51 @@ resource "aws_iam_role_policy" "eventbird_execution_role_policy" {
 EOF
 }
 
+resource "aws_iam_role" "eventbird_event_role" {
+  name               = "eventbird-event-role"
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "events.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy" "eventbird_event_role_policy" {
+  name = "eventbird-event-role-policy"
+  role = "${aws_iam_role.eventbird_event_role.id}"
+
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "ecs:RunTask"
+      ],
+      "Effect": "Allow",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+          "*"
+      ]
+    }
+  ]
+}
+EOF
+}
+
 resource "aws_security_group" "eventbird_task_sg" {
   name   = "eventbird_task_sg"
   vpc_id = "${data.aws_vpc.tekis_vpc.id}"
@@ -235,14 +280,14 @@ DEFINITION
 resource "aws_cloudwatch_event_rule" "eventbird_poll_events_event" {
   name                = "eventbird-poll-events"
   is_enabled          = true
-  schedule_expression = "rate(15 minutes)"
+  schedule_expression = "cron(/15 * * * ? *)"
 }
 
 resource "aws_cloudwatch_event_target" "eventbird_poll_events_event_target" {
   target_id = "eventbird-poll-events"
   arn       = "${data.aws_ecs_cluster.christina_regina.arn}"
   rule      = "${aws_cloudwatch_event_rule.eventbird_poll_events_event.name}"
-  role_arn  = "${aws_iam_role.eventbird_execution_role.arn}"
+  role_arn  = "${aws_iam_role.eventbird_event_role.arn}"
 
   ecs_target {
     launch_type         = "FARGATE"
@@ -267,7 +312,7 @@ resource "aws_cloudwatch_event_target" "eventbird_todays_events_event_target" {
   target_id = "eventbird-todays-events"
   arn       = "${data.aws_ecs_cluster.christina_regina.arn}"
   rule      = "${aws_cloudwatch_event_rule.eventbird_todays_events_event.name}"
-  role_arn  = "${aws_iam_role.eventbird_execution_role.arn}"
+  role_arn  = "${aws_iam_role.eventbird_event_role.arn}"
 
   ecs_target {
     launch_type         = "FARGATE"
@@ -292,12 +337,12 @@ resource "aws_cloudwatch_event_target" "eventbird_todays_food_event_target" {
   target_id = "eventbird-todays-food"
   arn       = "${data.aws_ecs_cluster.christina_regina.arn}"
   rule      = "${aws_cloudwatch_event_rule.eventbird_todays_food_event.name}"
-  role_arn  = "${aws_iam_role.eventbird_execution_role.arn}"
+  role_arn  = "${aws_iam_role.eventbird_event_role.arn}"
 
   ecs_target {
     launch_type         = "FARGATE"
     task_count          = 1
-    task_definition_arn = "${aws_ecs_task_definition.eventbird_todays_food_task.arn}" 
+    task_definition_arn = "${aws_ecs_task_definition.eventbird_todays_food_task.arn}"
 
     network_configuration {
       assign_public_ip = true
