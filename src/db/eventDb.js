@@ -20,7 +20,10 @@ const fetchPostedEvents = () => db
     return []
   })
 
+const closeDbConnection = () => db.end()
+
 module.exports = {
   fetchPostedEvents,
-  addNewEvent
+  addNewEvent,
+  closeDbConnection
 }

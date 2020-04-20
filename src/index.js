@@ -1,5 +1,5 @@
 const TelegramBotApi = require('node-telegram-bot-api')
-const { fetchPostedEvents, addNewEvent } = require('./db/eventDb')
+const { fetchPostedEvents, addNewEvent, closeDbConnection } = require('./db/eventDb')
 const moment = require('moment')
 const R = require('ramda')
 const request = require('request-promise')
@@ -7,16 +7,20 @@ const fetchRestaurantFoodlist = require('./services/FoodlistService')
 const knex = require('knex')
 
 moment.locale('fi')
-knex({
+const instance = knex({
   client: 'pg',
   connection: process.env.DATABASE_URL
 })
+
+instance
   .migrate
   .latest()
   .catch(e => {
     console.error('Unable to migrate database', e)
+    instance.destroy()
     process.exit(1)
   })
+  .finally(() => instance.destroy())
 
 if (!process.env.API_TOKEN) {
   console.error('No api token found.')
@@ -44,6 +48,7 @@ function pollEvents() {
       )
     )
     .then(newEvents)
+
 }
 
 function getEventURL(id) {
@@ -132,8 +137,8 @@ const createFoodList = groupedList => {
   }, '')
 }
 
-function todaysFood(id) {
-  fetchRestaurantFoodlist('exactum').then(list => {
+async function todaysFood(id) {
+  await fetchRestaurantFoodlist('exactum').then(list => {
     const header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list.foodList) return
     if (!list.foodList.length) {
@@ -149,7 +154,7 @@ function todaysFood(id) {
   })
   .catch(err => console.error(err))
 
-  fetchRestaurantFoodlist('chemicum').then(list => {
+  await fetchRestaurantFoodlist('chemicum').then(list => {
     const header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list.foodList) return
     if (!list.foodList.length) {
@@ -166,9 +171,9 @@ function todaysFood(id) {
   .catch(err => console.error(err))
 }
 
-process.env.JOB_MODE === 'postFood' && todaysFood()
-process.env.JOB_MODE === 'todaysEvents' && todaysEvents()
-process.env.JOB_MODE === 'pollEvents' && pollEvents()
+process.env.JOB_MODE === 'postFood' && todaysFood().finally(() => closeDbConnection())
+process.env.JOB_MODE === 'todaysEvents' && todaysEvents().finally(() => closeDbConnection())
+process.env.JOB_MODE === 'pollEvents' && pollEvents().finally(() => closeDbConnection())
 
 function broadcastMessage(message, disableWebPagePreview) {
   if (!message) return
