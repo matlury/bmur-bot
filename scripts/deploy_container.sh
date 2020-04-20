@@ -1,7 +1,10 @@
 #!/bin/bash
 set -ex
-echo "Pushing container image to registry.tko-aly.fi"
-docker login registry.tko-aly.fi --username $DEPLOY_USERNAME --password $DEPLOY_PASSWORD
+pip install awscli
+export PATH=$PATH:$HOME/.local/bin
+echo "Logging into AWS ECR..."
+eval $(aws ecr get-login --region eu-central-1 --no-include-email)
+echo "Pushing container image to AWS ECR"
 docker build . -t eventbird-tg
-docker tag eventbird-tg:latest registry.tko-aly.fi/eventbird-tg:latest
-docker push registry.tko-aly.fi/eventbird-tg:latest
+docker tag eventbird-tg:latest $AWS_ECR_URL:latest
+docker push $AWS_ECR_URL:latest

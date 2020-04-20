@@ -10,7 +10,6 @@ const restaurants = {
   'yolo': 9
 }
 
-
 function parseFoodlistData({ data, information }) {
   const now = new Date();
   const unicafeFormat = format(now, 'EEEEEE dd.MM', { locale: fi })
@@ -50,4 +49,4 @@ function fetchRestaurantFoodlist(restaurant) {
     .then(parseFoodlistData)
 }
 
-module.exports = fetchRestaurantFoodlist;
+module.exports = fetchRestaurantFoodlist

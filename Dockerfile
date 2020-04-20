@@ -6,11 +6,9 @@ RUN apk --no-cache add --virtual native-deps \
 WORKDIR /app
 COPY yarn.lock ./
 COPY package.json ./
-RUN yarn --dev
+RUN yarn
 
-COPY services ./services
-COPY index.js ./
-COPY events.json ./
-COPY translations.js ./
+COPY src ./
+COPY migrations ./
 
 CMD ["yarn", "start"]
