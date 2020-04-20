@@ -77,7 +77,7 @@ resource "aws_iam_role_policy" "eventbird_execution_role_policy" {
   name = "eventbird-execution-role-policy"
   role = "${aws_iam_role.eventbird_execution_role.id}"
 
-  policy = <<-EOF
+  policy = <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -93,20 +93,12 @@ resource "aws_iam_role_policy" "eventbird_execution_role_policy" {
         "ecr:GetAuthorizationToken",
         "ecr:BatchCheckLayerAvailability",
         "ecr:GetDownloadUrlForLayer",
-        "ecr:BatchGetImage"
-      ],
-      "Effect": "Allow",
-      "Resource": "*"        
-    },
-    {
-      "Action": [
+        "ecr:BatchGetImage",
         "logs:CreateLogStream",
         "logs:PutLogEvents"
       ],
       "Effect": "Allow",
-      "Resource": [
-        "arn:aws:logs:*:*:*"
-      ]
+      "Resource": "*"
     }
   ]
 }
@@ -255,6 +247,7 @@ resource "aws_cloudwatch_event_target" "eventbird_poll_events_event_target" {
   target_id = "eventbird-poll-events"
   arn       = "${data.aws_ecs_cluster.christina_regina.arn}"
   rule      = "${aws_cloudwatch_event_rule.eventbird_poll_events_event.name}"
+  role_arn  = "${aws_iam_role.eventbird_execution_role.arn}"
 
   ecs_target {
     launch_type         = "FARGATE"
@@ -264,7 +257,7 @@ resource "aws_cloudwatch_event_target" "eventbird_poll_events_event_target" {
     network_configuration {
       assign_public_ip = true
       security_groups  = ["${aws_security_group.eventbird_task_sg.id}"]
-      subnets          = data.aws_subnet_ids.private_subnet_ids.ids
+      subnets          = "${data.aws_subnet_ids.private_subnet_ids.ids}"
     }
   }
 }
@@ -272,13 +265,14 @@ resource "aws_cloudwatch_event_target" "eventbird_poll_events_event_target" {
 resource "aws_cloudwatch_event_rule" "eventbird_todays_events_event" {
   name                = "eventbird-todays-events"
   is_enabled          = true
-  schedule_expression = "cron(0 7 * * * *)"
+  schedule_expression = "cron(0 4 * * ? *)"
 }
 
 resource "aws_cloudwatch_event_target" "eventbird_todays_events_event_target" {
   target_id = "eventbird-todays-events"
   arn       = "${data.aws_ecs_cluster.christina_regina.arn}"
   rule      = "${aws_cloudwatch_event_rule.eventbird_todays_events_event.name}"
+  role_arn  = "${aws_iam_role.eventbird_execution_role.arn}"
 
   ecs_target {
     launch_type         = "FARGATE"
@@ -288,7 +282,7 @@ resource "aws_cloudwatch_event_target" "eventbird_todays_events_event_target" {
     network_configuration {
       assign_public_ip = true
       security_groups  = ["${aws_security_group.eventbird_task_sg.id}"]
-      subnets          = data.aws_subnet_ids.private_subnet_ids.ids
+      subnets          = "${data.aws_subnet_ids.private_subnet_ids.ids}"
     }
   }
 }
@@ -296,13 +290,14 @@ resource "aws_cloudwatch_event_target" "eventbird_todays_events_event_target" {
 resource "aws_cloudwatch_event_rule" "eventbird_todays_food_event" {
   name                = "eventbird-todays-food"
   is_enabled          = true
-  schedule_expression = "cron(0 4 * * MON-FRI *)"
+  schedule_expression = "cron(0 7 ? * MON-FRI *)"
 }
 
 resource "aws_cloudwatch_event_target" "eventbird_todays_food_event_target" {
   target_id = "eventbird-todays-food"
   arn       = "${data.aws_ecs_cluster.christina_regina.arn}"
   rule      = "${aws_cloudwatch_event_rule.eventbird_todays_food_event.name}"
+  role_arn  = "${aws_iam_role.eventbird_execution_role.arn}"
 
   ecs_target {
     launch_type         = "FARGATE"
@@ -312,7 +307,7 @@ resource "aws_cloudwatch_event_target" "eventbird_todays_food_event_target" {
     network_configuration {
       assign_public_ip = true
       security_groups  = ["${aws_security_group.eventbird_task_sg.id}"]
-      subnets          = data.aws_subnet_ids.private_subnet_ids.ids
+      subnets          = "${data.aws_subnet_ids.private_subnet_ids.ids}"
     }
   }
 }
