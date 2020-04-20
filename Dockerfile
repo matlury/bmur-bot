@@ -8,7 +8,7 @@ COPY yarn.lock ./
 COPY package.json ./
 RUN yarn
 
-COPY src ./
-COPY migrations ./
+COPY src ./src
+COPY migrations ./migrations
 
 CMD ["yarn", "start"]

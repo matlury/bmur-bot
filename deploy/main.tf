@@ -63,7 +63,7 @@ resource "aws_iam_role" "eventbird_execution_role" {
     {
       "Action": "sts:AssumeRole",
       "Principal": {
-        "Service": "ecs.amazonaws.com"
+        "Service": "ecs-tasks.amazonaws.com"
       },
       "Effect": "Allow",
       "Sid": ""
@@ -83,19 +83,14 @@ resource "aws_iam_role_policy" "eventbird_execution_role_policy" {
   "Statement": [
     {
       "Action": [
-        "ssm:GetParameter"
-      ],
-      "Effect": "Allow",
-      "Resource": "*"
-    },
-    {
-      "Action": [
         "ecr:GetAuthorizationToken",
         "ecr:BatchCheckLayerAvailability",
         "ecr:GetDownloadUrlForLayer",
         "ecr:BatchGetImage",
         "logs:CreateLogStream",
-        "logs:PutLogEvents"
+        "logs:PutLogEvents",
+        "ssm:GetParameter",
+        "ssm:GetParameters"
       ],
       "Effect": "Allow",
       "Resource": "*"
