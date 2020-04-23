@@ -75,7 +75,7 @@ function retrieveEvents() {
   }
 
   return request
-    .get('https://members.tko-aly.fi/api/events?fromDate=' + moment(Date.now() + (1000 * 60 * 60 * 2)).toISOString(), opts)
+    .get('https://event-api.tko-aly.fi/api/events?fromDate=' + moment(Date.now() + (1000 * 60 * 60 * 2)).toISOString(), opts)
     .then(JSON.parse)
     .then(filterDeletedEvents)
 }
