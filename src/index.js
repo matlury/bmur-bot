@@ -101,6 +101,7 @@ function listEvents(events, dateFormat, showRegistTimes) {
 
 const todaysEvents = () =>
   pollEvents()
+    .then(retrieveEvents)
     .then(events => {
       var today = moment()
       var eventsToday = events.filter(e => moment(e.starts).isSame(today, 'day'))
