@@ -124,7 +124,7 @@ function newEvents(events) {
     res = '*Uusi tapahtuma:* \n'
   }
   res += listEvents(events, 'DD.MM.YYYY HH:mm')
-  broadcastMessage(res.trim(), true)
+  return broadcastMessage(res.trim(), true)
 }
 
 const createFoodList = groupedList => {
@@ -143,9 +143,9 @@ async function todaysFood(id) {
     const header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list.foodList) return
     if (!list.foodList.length) {
-      broadcastToDaily(header + 'ei ruokaa 😭😭😭'.trim())
+      return broadcastToDaily(header + 'ei ruokaa 😭😭😭'.trim())
     } else {
-      R.pipe(
+      return R.pipe(
         R.groupBy(({ price }) => price.name),
         createFoodList,
         list => `${header} ${list}`,
@@ -159,9 +159,9 @@ async function todaysFood(id) {
     const header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
     if (!list.foodList) return
     if (!list.foodList.length) {
-      broadcastToDaily(header + 'ei ruokaa 😭😭😭'.trim())
+      return broadcastToDaily(header + 'ei ruokaa 😭😭😭'.trim())
     } else {
-      R.pipe(
+      return R.pipe(
         R.groupBy(({ price }) => price.name),
         createFoodList,
         list => `${header} ${list}`,
