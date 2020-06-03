@@ -15,7 +15,6 @@
     "dotenv": "^2.0.0",
     "knex": "^0.21.0",
     "moment": "^2.14.1",
-    "node-cron": "^1.1.2",
     "node-telegram-bot-api": "^0.40.0",
     "pg": "^8.0.2",
     "ramda": "^0.22.1",

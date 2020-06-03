@@ -38,3 +38,5 @@ override.tf.json
 # End of https://www.gitignore.io/api/terraform
 
 .vscode
+
+eventbird.zip

@@ -8,12 +8,13 @@ terraform {
 
 provider "aws" {
   region  = "eu-west-1"
-  profile = "tekis"
 }
 
-data "aws_ecr_repository" "eventbird_repository" {
-  name = "eventbird"
+variable "github_sha" {
+  default = "latest"
+  type    = "string"
 }
+
 
 data "aws_ssm_parameter" "eventbird_api_token" {
   name = "eventbird-api-token"
@@ -50,103 +51,43 @@ data "aws_subnet_ids" "private_subnet_ids" {
   }
 }
 
-data "aws_ecs_cluster" "christina_regina" {
-  cluster_name = "christina-regina"
-}
-
-resource "aws_iam_role" "eventbird_execution_role" {
-  name               = "eventbird-execution-role"
-  assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Action": "sts:AssumeRole",
-      "Principal": {
-        "Service": "ecs-tasks.amazonaws.com"
-      },
-      "Effect": "Allow",
-      "Sid": ""
-    }
+data "archive_file" "eventbird_package_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../"
+  output_path = "${path.module}/../eventbird.zip"
+  excludes = [
+    "eventbird.zip",
+    "package.json",
+    "yarn.lock",
+    "nodemon.json",
+    "deploy",
+    ".travis",
+    ".git",
+    "Dockerfile",
+    ".gitignore",
+    "README.md",
+    "scripts",
+    ".env",
+    ".env.example",
+    ".eslint.js"
   ]
 }
-EOF
+
+resource "aws_s3_bucket" "eventbird_package_bucket" {
+  bucket = "eventbird-package-bucket"
+  acl    = "private"
 }
 
-resource "aws_iam_role_policy" "eventbird_execution_role_policy" {
-  name = "eventbird-execution-role-policy"
-  role = "${aws_iam_role.eventbird_execution_role.id}"
 
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Action": [
-        "ecr:GetAuthorizationToken",
-        "ecr:BatchCheckLayerAvailability",
-        "ecr:GetDownloadUrlForLayer",
-        "ecr:BatchGetImage",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "ssm:GetParameter",
-        "ssm:GetParameters"
-      ],
-      "Effect": "Allow",
-      "Resource": "*"
-    }
-  ]
-}
-EOF
+resource "aws_s3_bucket_object" "eventbird_package_object" {
+  bucket     = "eventbird-package-bucket"
+  key        = "eventbird-package-${var.github_sha}.zip"
+  source     = "../eventbird.zip"
+  depends_on = ["aws_s3_bucket.eventbird_package_bucket"]
 }
 
-resource "aws_iam_role" "eventbird_event_role" {
-  name               = "eventbird-event-role"
-  assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "events.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-EOF
-}
-
-resource "aws_iam_role_policy" "eventbird_event_role_policy" {
-  name = "eventbird-event-role-policy"
-  role = "${aws_iam_role.eventbird_event_role.id}"
-
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Action": [
-        "ecs:RunTask"
-      ],
-      "Effect": "Allow",
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": "iam:PassRole",
-      "Resource": [
-          "*"
-      ]
-    }
-  ]
-}
-EOF
-}
-
-resource "aws_security_group" "eventbird_task_sg" {
-  name   = "eventbird_task_sg"
+resource "aws_security_group" "eventbird_lambda_sg" {
+  name   = "eventbird_lambda_sg"
   vpc_id = "${data.aws_vpc.tekis_vpc.id}"
   egress {
     from_port   = 0
@@ -156,125 +97,95 @@ resource "aws_security_group" "eventbird_task_sg" {
   }
 }
 
-resource "aws_cloudwatch_log_group" "eventbird_cw" {
-  name = "/ecs/christina-regina/eventbird"
+resource "aws_cloudwatch_log_group" "eventbird_log_group" {
+  name              = "/aws/lambda/eventbird"
+  retention_in_days = 14
+}
+resource "aws_iam_policy" "eventbird_lambda_policy" {
+  name = "eventbird_lambda_polivy"
+  path = "/"
+
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "ssm:GetParameters",
+        "ssm:GetParameter",
+        "s3:PutObject",
+        "s3:ListBucket",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:CreateNetworkInterface",
+        "ec2:DeleteNetworkInterface",
+        "ec2:DescribeInstances",
+        "ec2:AttachNetworkInterface"
+      ],
+      "Resource": "*",
+      "Effect": "Allow"
+    }
+  ]
+}
+EOF
 }
 
-resource "aws_ecs_task_definition" "eventbird_todays_events_task" {
-  family                   = "eventbird-todays-events"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = 256
-  memory                   = 512
-  execution_role_arn       = "${aws_iam_role.eventbird_execution_role.arn}"
-  container_definitions    = <<DEFINITION
-[
-  {
-    "name": "eventbird-todays-events",
-    "image": "${data.aws_ecr_repository.eventbird_repository.repository_url}:latest",
-    "cpu": 256,
-    "memory": null,
-    "essential": true,
-    "logConfiguration": {
-      "logDriver": "awslogs",
-      "options": {
-        "awslogs-group": "${aws_cloudwatch_log_group.eventbird_cw.name}",
-        "awslogs-region": "eu-west-1",
-        "awslogs-stream-prefix": "ecs",
-        "awslogs-datetime-format": "%Y-%m-%d %H:%M:%S"
-      }
-    },
-    "environment": [
-      {"name": "JOB_MODE", "value": "todaysEvents"}
-    ],
-    "secrets": [
-      {"name": "API_TOKEN", "valueFrom": "${data.aws_ssm_parameter.eventbird_api_token.arn}"},
-      {"name": "TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID", "valueFrom": "${data.aws_ssm_parameter.eventbird_announcement_channel_id.arn}"},
-      {"name": "TELEGRAM_DAILY_BROADCAST_CHANNEL_ID", "valueFrom": "${data.aws_ssm_parameter.eventbird_daily_channel_id.arn}"},
-      {"name": "EVENT_API_TOKEN", "valueFrom": "${data.aws_ssm_parameter.eventbird_event_api_token.arn}"},
-      {"name": "DATABASE_URL", "valueFrom": "${data.aws_ssm_parameter.eventbird_database_url.arn}"}
-    ]
-  }
-]
-DEFINITION
+resource "aws_iam_role" "eventbird_iam_role" {
+  name = "eventbird-iam-role"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
 }
 
-resource "aws_ecs_task_definition" "eventbird_todays_food_task" {
-  family                   = "eventbird-todays-food"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = 256
-  memory                   = 512
-  execution_role_arn       = "${aws_iam_role.eventbird_execution_role.arn}"
-  container_definitions    = <<DEFINITION
-[
-  {
-    "name": "eventbird-todays-food",
-    "image": "${data.aws_ecr_repository.eventbird_repository.repository_url}:latest",
-    "cpu": 256,
-    "memory": null,
-    "essential": true,
-    "logConfiguration": {
-      "logDriver": "awslogs",
-      "options": {
-        "awslogs-group": "${aws_cloudwatch_log_group.eventbird_cw.name}",
-        "awslogs-region": "eu-west-1",
-        "awslogs-stream-prefix": "ecs",
-        "awslogs-datetime-format": "%Y-%m-%d %H:%M:%S"
-      }
-    },
-    "environment": [
-      {"name": "JOB_MODE", "value": "postFood"}
-    ],
-    "secrets": [
-      {"name": "API_TOKEN", "valueFrom": "${data.aws_ssm_parameter.eventbird_api_token.arn}"},
-      {"name": "TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID", "valueFrom": "${data.aws_ssm_parameter.eventbird_announcement_channel_id.arn}"},
-      {"name": "TELEGRAM_DAILY_BROADCAST_CHANNEL_ID", "valueFrom": "${data.aws_ssm_parameter.eventbird_daily_channel_id.arn}"},
-      {"name": "EVENT_API_TOKEN", "valueFrom": "${data.aws_ssm_parameter.eventbird_event_api_token.arn}"},
-      {"name": "DATABASE_URL", "valueFrom": "${data.aws_ssm_parameter.eventbird_database_url.arn}"}
-    ]
-  }
-]
-DEFINITION
+resource "aws_iam_role_policy_attachment" "eventbird_lambda_policy_attachment" {
+  role       = "${aws_iam_role.eventbird_iam_role.name}"
+  policy_arn = "${aws_iam_policy.eventbird_lambda_policy.arn}"
 }
 
-resource "aws_ecs_task_definition" "eventbird_poll_events_task" {
-  family                   = "eventbird-poll-events"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = 256
-  memory                   = 512
-  execution_role_arn       = "${aws_iam_role.eventbird_execution_role.arn}"
-  container_definitions    = <<DEFINITION
-[
-  {
-    "name": "eventbird-poll-events",
-    "image": "${data.aws_ecr_repository.eventbird_repository.repository_url}:latest",
-    "cpu": 256,
-    "memory": null,
-    "essential": true,
-    "logConfiguration": {
-      "logDriver": "awslogs",
-      "options": {
-        "awslogs-group": "${aws_cloudwatch_log_group.eventbird_cw.name}",
-        "awslogs-region": "eu-west-1",
-        "awslogs-stream-prefix": "ecs",
-        "awslogs-datetime-format": "%Y-%m-%d %H:%M:%S"
-      }
-    },
-    "environment": [
-      {"name": "JOB_MODE", "value": "pollEvents"}
-    ],
-    "secrets": [
-      {"name": "API_TOKEN", "valueFrom": "${data.aws_ssm_parameter.eventbird_api_token.arn}"},
-      {"name": "TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID", "valueFrom": "${data.aws_ssm_parameter.eventbird_announcement_channel_id.arn}"},
-      {"name": "TELEGRAM_DAILY_BROADCAST_CHANNEL_ID", "valueFrom": "${data.aws_ssm_parameter.eventbird_daily_channel_id.arn}"},
-      {"name": "EVENT_API_TOKEN", "valueFrom": "${data.aws_ssm_parameter.eventbird_event_api_token.arn}"},
-      {"name": "DATABASE_URL", "valueFrom": "${data.aws_ssm_parameter.eventbird_database_url.arn}"}
-    ]
+resource "aws_lambda_function" "eventbird_lambda" {
+  function_name = "eventbird-${var.github_sha}"
+  s3_bucket     = "eventbird-package-bucket"
+  s3_key        = "eventbird-package-${var.github_sha}.zip"
+  handler       = "src/index.handler"
+  role          = "${aws_iam_role.eventbird_iam_role.arn}"
+  runtime       = "nodejs12.x"
+
+  environment {
+    variables = {
+      API_TOKEN                                  = "${data.aws_ssm_parameter.eventbird_api_token.arn}"
+      TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID = "${data.aws_ssm_parameter.eventbird_announcement_channel_id.arn}"
+      TELEGRAM_DAILY_BROADCAST_CHANNEL_ID        = "${data.aws_ssm_parameter.eventbird_daily_channel_id.arn}"
+      EVENT_API_TOKEN                            = "${data.aws_ssm_parameter.eventbird_event_api_token.arn}"
+      DATABASE_URL                               = "${data.aws_ssm_parameter.eventbird_database_url.arn}"
+    }
   }
-]
-DEFINITION
+
+  vpc_config {
+    security_group_ids = ["${aws_security_group.eventbird_lambda_sg.id}"]
+    subnet_ids         = "${data.aws_subnet_ids.private_subnet_ids.ids}"
+  }
+
+  depends_on = [
+    "aws_iam_role_policy_attachment.eventbird_lambda_policy_attachment",
+    "aws_cloudwatch_log_group.eventbird_log_group",
+    "aws_s3_bucket.eventbird_package_bucket",
+    "aws_s3_bucket_object.eventbird_package_object"
+  ]
 }
 
 resource "aws_cloudwatch_event_rule" "eventbird_poll_events_event" {
@@ -284,22 +195,22 @@ resource "aws_cloudwatch_event_rule" "eventbird_poll_events_event" {
 }
 
 resource "aws_cloudwatch_event_target" "eventbird_poll_events_event_target" {
-  target_id = "eventbird-poll-events"
-  arn       = "${data.aws_ecs_cluster.christina_regina.arn}"
+  target_id = "eventbird_lambda"
+  arn       = "${aws_lambda_function.eventbird_lambda.arn}"
   rule      = "${aws_cloudwatch_event_rule.eventbird_poll_events_event.name}"
-  role_arn  = "${aws_iam_role.eventbird_event_role.arn}"
+  input     = <<EOF
+{
+  "jobMode": "pollEvents"
+}
+EOF
+}
 
-  ecs_target {
-    launch_type         = "FARGATE"
-    task_count          = 1
-    task_definition_arn = "${aws_ecs_task_definition.eventbird_poll_events_task.arn}"
-
-    network_configuration {
-      assign_public_ip = true
-      security_groups  = ["${aws_security_group.eventbird_task_sg.id}"]
-      subnets          = "${data.aws_subnet_ids.private_subnet_ids.ids}"
-    }
-  }
+resource "aws_lambda_permission" "eventbird_poll_events_event_permission" {
+  statement_id  = "AllowExecutionFromCloudWatchForEventPoll"
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.eventbird_lambda.function_name}"
+  principal     = "events.amazonaws.com"
+  source_arn    = "${aws_cloudwatch_event_rule.eventbird_poll_events_event.arn}"
 }
 
 resource "aws_cloudwatch_event_rule" "eventbird_todays_events_event" {
@@ -309,22 +220,22 @@ resource "aws_cloudwatch_event_rule" "eventbird_todays_events_event" {
 }
 
 resource "aws_cloudwatch_event_target" "eventbird_todays_events_event_target" {
-  target_id = "eventbird-todays-events"
-  arn       = "${data.aws_ecs_cluster.christina_regina.arn}"
+  target_id = "eventbird_lambda"
+  arn       = "${aws_lambda_function.eventbird_lambda.arn}"
   rule      = "${aws_cloudwatch_event_rule.eventbird_todays_events_event.name}"
-  role_arn  = "${aws_iam_role.eventbird_event_role.arn}"
+  input     = <<EOF
+{
+  "jobMode": "todaysEvents"
+}
+EOF
+}
 
-  ecs_target {
-    launch_type         = "FARGATE"
-    task_count          = 1
-    task_definition_arn = "${aws_ecs_task_definition.eventbird_todays_events_task.arn}"
-
-    network_configuration {
-      assign_public_ip = true
-      security_groups  = ["${aws_security_group.eventbird_task_sg.id}"]
-      subnets          = "${data.aws_subnet_ids.private_subnet_ids.ids}"
-    }
-  }
+resource "aws_lambda_permission" "eventbird_todays_events_event_permission" {
+  statement_id  = "AllowExecutionFromCloudWatchForTodaysEvents"
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.eventbird_lambda.function_name}"
+  principal     = "events.amazonaws.com"
+  source_arn    = "${aws_cloudwatch_event_rule.eventbird_todays_events_event.arn}"
 }
 
 resource "aws_cloudwatch_event_rule" "eventbird_todays_food_event" {
@@ -334,20 +245,20 @@ resource "aws_cloudwatch_event_rule" "eventbird_todays_food_event" {
 }
 
 resource "aws_cloudwatch_event_target" "eventbird_todays_food_event_target" {
-  target_id = "eventbird-todays-food"
-  arn       = "${data.aws_ecs_cluster.christina_regina.arn}"
+  target_id = "eventbird_lambda"
+  arn       = "${aws_lambda_function.eventbird_lambda.arn}"
   rule      = "${aws_cloudwatch_event_rule.eventbird_todays_food_event.name}"
-  role_arn  = "${aws_iam_role.eventbird_event_role.arn}"
+  input     = <<EOF
+{
+  "jobMode": "postFood"
+}
+EOF
+}
 
-  ecs_target {
-    launch_type         = "FARGATE"
-    task_count          = 1
-    task_definition_arn = "${aws_ecs_task_definition.eventbird_todays_food_task.arn}"
-
-    network_configuration {
-      assign_public_ip = true
-      security_groups  = ["${aws_security_group.eventbird_task_sg.id}"]
-      subnets          = "${data.aws_subnet_ids.private_subnet_ids.ids}"
-    }
-  }
+resource "aws_lambda_permission" "eventbird_todays_food_event_permissions" {
+  statement_id  = "AllowExecutionFromCloudWatchForTodaysFood"
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.eventbird_lambda.function_name}"
+  principal     = "events.amazonaws.com"
+  source_arn    = "${aws_cloudwatch_event_rule.eventbird_todays_food_event.arn}"
 }

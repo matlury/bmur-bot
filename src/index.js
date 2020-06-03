@@ -172,10 +172,6 @@ async function todaysFood(id) {
   .catch(err => console.error(err))
 }
 
-process.env.JOB_MODE === 'postFood' && todaysFood().finally(() => closeDbConnection())
-process.env.JOB_MODE === 'todaysEvents' && todaysEvents().finally(() => closeDbConnection())
-process.env.JOB_MODE === 'pollEvents' && pollEvents().finally(() => closeDbConnection())
-
 function broadcastMessage(message, disableWebPagePreview) {
   if (!message) return
   return telegramApi.sendMessage(process.env.TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID, message, {
@@ -190,4 +186,22 @@ function broadcastToDaily(message, disableWebPagePreview) {
     parse_mode: 'Markdown',
     disable_web_page_preview: !!disableWebPagePreview
   })
+}
+
+exports.handler = async ({ jobMode }) => {
+  switch(jobMode) {
+    case 'postFood':
+      await todaysFood()
+      break
+    case 'todaysEvents':
+      await todaysEvents()
+      break
+    case 'pollEvents':
+      await pollEvents()
+      break
+    default:
+      break
+  }
+
+  await closeDbConnection()
 }
