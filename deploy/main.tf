@@ -15,25 +15,24 @@ variable "github_sha" {
   type    = "string"
 }
 
-
-data "aws_ssm_parameter" "eventbird_api_token" {
-  name = "eventbird-api-token"
+variable "api_token" {
+  type = "string"
 }
 
-data "aws_ssm_parameter" "eventbird_event_api_token" {
-  name = "eventbird-event-api-token"
+variable "db_url" {
+  type = "string"
 }
 
-data "aws_ssm_parameter" "eventbird_announcement_channel_id" {
-  name = "eventbird-telegram-announcement-brodcast-channel-id"
+variable "telegram_announce_broadcast_channel" {
+  type = "string"
 }
 
-data "aws_ssm_parameter" "eventbird_daily_channel_id" {
-  name = "eventbird-telegram-daily-broadcast-channel-id"
+variable "telegram_daily_broadcast_channel" {
+  type = "string"
 }
 
-data "aws_ssm_parameter" "eventbird_database_url" {
-  name = "eventbird-database-url"
+variable "event_api_token" {
+  type = "string"
 }
 
 data "aws_vpc" "tekis_vpc" {
@@ -167,11 +166,11 @@ resource "aws_lambda_function" "eventbird_lambda" {
 
   environment {
     variables = {
-      API_TOKEN                                  = "${data.aws_ssm_parameter.eventbird_api_token.arn}"
-      TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID = "${data.aws_ssm_parameter.eventbird_announcement_channel_id.arn}"
-      TELEGRAM_DAILY_BROADCAST_CHANNEL_ID        = "${data.aws_ssm_parameter.eventbird_daily_channel_id.arn}"
-      EVENT_API_TOKEN                            = "${data.aws_ssm_parameter.eventbird_event_api_token.arn}"
-      DATABASE_URL                               = "${data.aws_ssm_parameter.eventbird_database_url.arn}"
+      API_TOKEN                                  = "${var.api_token}"
+      TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID = "${var.telegram_announce_broadcast_channel}"
+      TELEGRAM_DAILY_BROADCAST_CHANNEL_ID        = "${var.telegram_daily_broadcast_channel}"
+      EVENT_API_TOKEN                            = "${var.event_api_token}"
+      DATABASE_URL                               = "${var.db_url}"
     }
   }
 
