@@ -38,7 +38,6 @@ jobs:
         terraform plan -out=plan
     - name: Terraform Apply
       run: |
-        yarn install
         cd ./deploy
         export TF_VAR_github_sha=${GITHUB_SHA::8}
         terraform apply plan
