@@ -9,11 +9,10 @@ const knex = require('knex')
 moment.locale('fi')
 const instance = knex({
   client: 'pg',
-  connection: process.env.DATABASE_URL
+  connection: process.env.DATABASE_URL,
 })
 
-instance
-  .migrate
+instance.migrate
   .latest()
   .catch(e => {
     console.error('Unable to migrate database', e)
@@ -29,26 +28,18 @@ if (!process.env.API_TOKEN) {
 
 const telegramApi = new TelegramBotApi(process.env.API_TOKEN)
 
-const filterPostedEvents = data => 
-  fetchPostedEvents()
-    .then(postedEvents => {
-      const ids = data.map(R.view(R.lensProp('id')))
-      return R.filter(({ id }) => R.difference(ids, postedEvents).includes(id), data)
-    })
-
+const filterPostedEvents = data =>
+  fetchPostedEvents().then(postedEvents => {
+    const ids = data.map(R.view(R.lensProp('id')))
+    return R.filter(({ id }) => R.difference(ids, postedEvents).includes(id), data)
+  })
 
 function pollEvents() {
   console.log('polling events...')
   return retrieveEvents()
     .then(filterPostedEvents)
-    .then(
-      R.pipe(
-        R.map(addNewEvent),
-        promises => Promise.all(promises)
-      )
-    )
+    .then(R.pipe(R.map(addNewEvent), promises => Promise.all(promises)))
     .then(newEvents)
-
 }
 
 function getEventURL(id) {
@@ -56,26 +47,45 @@ function getEventURL(id) {
 }
 
 function makeEventHumanReadable(dateFormat) {
-  return function(e) {
-    return moment(e.starts).format(dateFormat) + ': [' + e.name.trim() + '](' + getEventURL(e.id) + ')'
+  return function (e) {
+    return (
+      moment(e.starts).format(dateFormat) +
+      ': [' +
+      e.name.trim() +
+      '](' +
+      getEventURL(e.id) +
+      ')'
+    )
   }
 }
 
 function makeRegistHumanReadable(dateFormat) {
-  return function(e) {
-    return 'Ilmo aukeaa ' + moment(e.registration_starts).format(dateFormat) + ': [' + e.name.trim() + '](' + getEventURL(e.id) + ')'
+  return function (e) {
+    return (
+      'Ilmo aukeaa ' +
+      moment(e.registration_starts).format(dateFormat) +
+      ': [' +
+      e.name.trim() +
+      '](' +
+      getEventURL(e.id) +
+      ')'
+    )
   }
 }
 
 function retrieveEvents() {
   const opts = {
     headers: {
-      'X-Token': process.env.EVENT_API_TOKEN
-    }
+      'X-Token': process.env.EVENT_API_TOKEN,
+    },
   }
 
   return request
-    .get('https://event-api.tko-aly.fi/api/events?fromDate=' + moment(Date.now() + (1000 * 60 * 60 * 2)).toISOString(), opts)
+    .get(
+      'https://event-api.tko-aly.fi/api/events?fromDate=' +
+        moment(Date.now() + 1000 * 60 * 60 * 2).toISOString(),
+      opts
+    )
     .then(JSON.parse)
     .then(filterDeletedEvents)
 }
@@ -105,10 +115,18 @@ const todaysEvents = () =>
     .then(events => {
       var today = moment()
       var eventsToday = events.filter(e => moment(e.starts).isSame(today, 'day'))
-      var registsToday = events.filter(e => moment(e.registration_starts).isSame(today, 'day'))
-      
-      if ((eventsToday && eventsToday.length > 0) || (registsToday && registsToday.length > 0)) {
-        var message = '*Tänään:* \n' + listEvents(eventsToday, 'HH:mm') + listEvents(registsToday, 'HH:mm', true)
+      var registsToday = events.filter(e =>
+        moment(e.registration_starts).isSame(today, 'day')
+      )
+
+      if (
+        (eventsToday && eventsToday.length > 0) ||
+        (registsToday && registsToday.length > 0)
+      ) {
+        var message =
+          '*Tänään:* \n' +
+          listEvents(eventsToday, 'HH:mm') +
+          listEvents(registsToday, 'HH:mm', true)
         broadcastMessage(message.trim(), true)
       }
     })
@@ -129,67 +147,81 @@ function newEvents(events) {
 
 const createFoodList = groupedList => {
   const keys = R.keys(groupedList)
-  return keys
-    .reduce((prev, key) => {
-      const values = groupedList[key]
-      const joinedValues = values
-        .reduce((prev, { name, warnings }) => `${prev}  -  ${name} ${warnings.length !== 0 ? '_(' : ''}${warnings.join(', ')}${warnings.length !== 0 ? ')_' : ''}\n`, '')
-      return `${prev}${key}\n${joinedValues}\n\n`
+  return keys.reduce((prev, key) => {
+    const values = groupedList[key]
+    const joinedValues = values.reduce(
+      (prev, { name, warnings }) =>
+        `${prev}  -  ${name} ${warnings.length !== 0 ? '_(' : ''}${warnings.join(', ')}${
+          warnings.length !== 0 ? ')_' : ''
+        }\n`,
+      ''
+    )
+    return `${prev}${key}\n${joinedValues}\n\n`
   }, '')
 }
 
 async function todaysFood(id) {
-  await fetchRestaurantFoodlist('exactum').then(list => {
-    const header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
-    if (!list.foodList) return
-    if (!list.foodList.length) {
-      return broadcastToDaily(header + 'ei ruokaa 😭😭😭'.trim())
-    } else {
-      return R.pipe(
-        R.groupBy(({ price }) => price.name),
-        createFoodList,
-        list => `${header} ${list}`,
-        broadcastToDaily
-      )(list.foodList)
-    }
-  })
-  .catch(err => console.error(err))
+  await fetchRestaurantFoodlist('exactum')
+    .then(list => {
+      const header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
+      if (!list.foodList) return
+      if (!list.foodList.length) {
+        return broadcastToDaily(header + 'ei ruokaa 😭😭😭'.trim())
+      } else {
+        return R.pipe(
+          R.groupBy(({ price }) => price.name),
+          createFoodList,
+          list => `${header} ${list}`,
+          broadcastToDaily
+        )(list.foodList)
+      }
+    })
+    .catch(err => console.error(err))
 
-  await fetchRestaurantFoodlist('chemicum').then(list => {
-    const header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
-    if (!list.foodList) return
-    if (!list.foodList.length) {
-      return broadcastToDaily(header + 'ei ruokaa 😭😭😭'.trim())
-    } else {
-      return R.pipe(
-        R.groupBy(({ price }) => price.name),
-        createFoodList,
-        list => `${header} ${list}`,
-        broadcastToDaily
-      )(list.foodList)
-    }
-  })
-  .catch(err => console.error(err))
+  await fetchRestaurantFoodlist('chemicum')
+    .then(list => {
+      const header = `*Päivän ruoka:* \n\n*UniCafe ${list.restaurantName}:* \n\n`
+      if (!list.foodList) return
+      if (!list.foodList.length) {
+        return broadcastToDaily(header + 'ei ruokaa 😭😭😭'.trim())
+      } else {
+        return R.pipe(
+          R.groupBy(({ price }) => price.name),
+          createFoodList,
+          list => `${header} ${list}`,
+          broadcastToDaily
+        )(list.foodList)
+      }
+    })
+    .catch(err => console.error(err))
 }
 
 function broadcastMessage(message, disableWebPagePreview) {
   if (!message) return
-  return telegramApi.sendMessage(process.env.TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID, message, {
-    parse_mode: 'Markdown',
-    disable_web_page_preview: !!disableWebPagePreview
-  })
+  return telegramApi.sendMessage(
+    process.env.TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID,
+    message,
+    {
+      parse_mode: 'Markdown',
+      disable_web_page_preview: !!disableWebPagePreview,
+    }
+  )
 }
 
 function broadcastToDaily(message, disableWebPagePreview) {
   if (!message) return
-  return telegramApi.sendMessage(process.env.TELEGRAM_DAILY_BROADCAST_CHANNEL_ID, message, {
-    parse_mode: 'Markdown',
-    disable_web_page_preview: !!disableWebPagePreview
-  })
+  return telegramApi.sendMessage(
+    process.env.TELEGRAM_DAILY_BROADCAST_CHANNEL_ID,
+    message,
+    {
+      parse_mode: 'Markdown',
+      disable_web_page_preview: !!disableWebPagePreview,
+    }
+  )
 }
 
 exports.handler = async ({ jobMode }) => {
-  switch(jobMode) {
+  switch (jobMode) {
     case 'postFood':
       await todaysFood()
       break
