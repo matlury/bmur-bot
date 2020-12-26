@@ -1,5 +1,10 @@
 const TelegramBotApi = require('node-telegram-bot-api')
-const { fetchPostedEvents, addNewEvent, closeDbConnection } = require('./db/eventDb')
+const {
+  fetchPostedEvents,
+  addNewEvent,
+  closeDbConnection,
+  createConnection,
+} = require('./db/eventDb')
 const moment = require('moment')
 const R = require('ramda')
 const request = require('request-promise')
@@ -7,19 +12,22 @@ const fetchRestaurantFoodlist = require('./services/FoodlistService')
 const knex = require('knex')
 
 moment.locale('fi')
-const instance = knex({
-  client: 'pg',
-  connection: process.env.DATABASE_URL,
-})
 
-instance.migrate
-  .latest()
-  .catch(e => {
-    console.error('Unable to migrate database', e)
-    instance.destroy()
-    process.exit(1)
+const migrate = () => {
+  const instance = knex({
+    client: 'pg',
+    connection: process.env.DATABASE_URL,
   })
-  .finally(() => instance.destroy())
+
+  return instance.migrate
+    .latest()
+    .catch(e => {
+      console.error('Unable to migrate database', e)
+      instance.destroy()
+      process.exit(1)
+    })
+    .finally(() => instance.destroy())
+}
 
 if (!process.env.API_TOKEN) {
   console.error('No api token found.')
@@ -73,22 +81,14 @@ function makeRegistHumanReadable(dateFormat) {
   }
 }
 
-function retrieveEvents() {
-  const opts = {
-    headers: {
-      'X-Token': process.env.EVENT_API_TOKEN,
-    },
-  }
-
-  return request
+const retrieveEvents = () =>
+  request
     .get(
       'https://event-api.tko-aly.fi/api/events?fromDate=' +
-        moment(Date.now() + 1000 * 60 * 60 * 2).toISOString(),
-      opts
+        moment(Date.now() + 1000 * 60 * 60 * 2).toISOString()
     )
     .then(JSON.parse)
     .then(filterDeletedEvents)
-}
 
 function filterDeletedEvents(events) {
   return events.filter(e => e.deleted === 0)
@@ -221,6 +221,9 @@ function broadcastToDaily(message, disableWebPagePreview) {
 }
 
 exports.handler = async ({ jobMode }) => {
+  await migrate()
+  await createConnection()
+
   switch (jobMode) {
     case 'postFood':
       await todaysFood()

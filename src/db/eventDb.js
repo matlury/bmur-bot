@@ -3,7 +3,7 @@ const db = new pg.Client({
   connectionString: process.env.DATABASE_URL,
 })
 
-db.connect()
+const createConnection = () => db.connect()
 
 const addNewEvent = ({ id, ...event }) =>
   db
@@ -27,5 +27,6 @@ const closeDbConnection = () => db.end()
 module.exports = {
   fetchPostedEvents,
   addNewEvent,
+  createConnection,
   closeDbConnection,
 }
