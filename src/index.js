@@ -1,4 +1,3 @@
-const TelegramBotApi = require('node-telegram-bot-api')
 const {
   fetchPostedEvents,
   addNewEvent,
@@ -7,9 +6,11 @@ const {
 } = require('./db/eventDb')
 const moment = require('moment')
 const R = require('ramda')
-const request = require('request-promise')
 const fetchRestaurantFoodlist = require('./services/FoodlistService')
+const telegram = require('./services/telegramService')
 const knex = require('knex')
+const axios = require('axios')
+require('dotenv').config({ silent: true })
 
 moment.locale('fi')
 
@@ -33,8 +34,6 @@ if (!process.env.API_TOKEN) {
   console.error('No api token found.')
   process.exit(1)
 }
-
-const telegramApi = new TelegramBotApi(process.env.API_TOKEN)
 
 const filterPostedEvents = data =>
   fetchPostedEvents().then(postedEvents => {
@@ -82,13 +81,12 @@ function makeRegistHumanReadable(dateFormat) {
 }
 
 const retrieveEvents = () =>
-  request
+  axios
     .get(
       'https://event-api.tko-aly.fi/api/events?fromDate=' +
         moment(Date.now() + 1000 * 60 * 60 * 2).toISOString()
     )
-    .then(JSON.parse)
-    .then(filterDeletedEvents)
+    .then(({ data }) => filterDeletedEvents(data))
 
 function filterDeletedEvents(events) {
   return events.filter(e => e.deleted === 0)
@@ -198,25 +196,19 @@ async function todaysFood(id) {
 
 function broadcastMessage(message, disableWebPagePreview) {
   if (!message) return
-  return telegramApi.sendMessage(
+  return telegram.sendMessage(
     process.env.TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID,
     message,
-    {
-      parse_mode: 'Markdown',
-      disable_web_page_preview: !!disableWebPagePreview,
-    }
+    !!disableWebPagePreview
   )
 }
 
 function broadcastToDaily(message, disableWebPagePreview) {
   if (!message) return
-  return telegramApi.sendMessage(
+  return telegram.sendMessage(
     process.env.TELEGRAM_DAILY_BROADCAST_CHANNEL_ID,
     message,
-    {
-      parse_mode: 'Markdown',
-      disable_web_page_preview: !!disableWebPagePreview,
-    }
+    !!disableWebPagePreview
   )
 }
 

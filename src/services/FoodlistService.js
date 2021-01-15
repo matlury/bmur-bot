@@ -1,7 +1,7 @@
-const request = require('request-promise')
 const fi = require('date-fns/locale/fi')
 const { format } = require('date-fns')
 const R = require('ramda')
+const axios = require('axios')
 
 const restaurants = {
   chemicum: 10,
@@ -13,6 +13,7 @@ const restaurants = {
 function parseFoodlistData({ data, information }) {
   const now = new Date()
   const unicafeFormat = format(now, 'EEEEEE dd.MM', { locale: fi })
+
   const foodList = R.pipe(
     R.filter(({ date }) => date.toLowerCase() === unicafeFormat),
     R.chain(({ data }) => data),
@@ -30,6 +31,7 @@ function parseFoodlistData({ data, information }) {
       warnings: meta['1'],
     }))
   )(data)
+
   return {
     restaurantName: information.restaurant,
     foodList,
@@ -43,10 +45,9 @@ function parseFoodlistData({ data, information }) {
  */
 function fetchRestaurantFoodlist(restaurant) {
   if (!restaurants[restaurant]) return Promise.reject('No restaurant found')
-  return request
+  return axios
     .get('http://messi.hyyravintolat.fi/publicapi/restaurant/' + restaurants[restaurant])
-    .then(JSON.parse)
-    .then(parseFoodlistData)
+    .then(({ data }) => parseFoodlistData(data))
 }
 
 module.exports = fetchRestaurantFoodlist
