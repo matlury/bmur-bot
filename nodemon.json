@@ -1,5 +1,0 @@
-  {
-  "watch": ["."],
-  "ext": "js",
-  "exec": "node -r dotenv/config -p \"require('./src/index.js').handler({ jobMode: process.env.JOB_MODE })\""
-}
