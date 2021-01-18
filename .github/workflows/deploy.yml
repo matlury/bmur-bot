@@ -43,6 +43,8 @@ jobs:
         rm -r ./node_modules
         yarn install --production
         cp -r ./node_modules ./build/
+        cp -r ./migrations ./build/
+        cp knexfile.js ./build/knexfile.js
         cd ./deploy
         export TF_VAR_github_sha=${GITHUB_SHA::8}
         terraform plan -out=plan
