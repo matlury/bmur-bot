@@ -3,11 +3,9 @@ import { channels, config } from '../constants'
 
 type Channel = keyof typeof channels
 
-export const sendMessage = async (
-  channel: Channel,
-  message: string,
-  disableWebPagePreview: boolean
-): Promise<void> => {
+export const sendMessage = (channel: Channel, disableWebPagePreview: boolean) => async (
+  message: string
+) => {
   if (!message) return
 
   await axios.post(`https://api.telegram.org/bot${config.telegramAPIToken}/sendMessage`, {

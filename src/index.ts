@@ -11,15 +11,15 @@ exports.handler = async ({ jobMode }: { jobMode: JobMode }) => {
   try {
     switch (jobMode) {
       case 'postFood':
-        await sendMessage('daily', await foodListByRestaurant('exactum'), false)
-        await sendMessage('daily', await foodListByRestaurant('chemicum'), false)
+        await foodListByRestaurant('exactum').then(sendMessage('daily', false))
+        await foodListByRestaurant('chemicum').then(sendMessage('daily', false))
         break
       case 'todaysEvents':
-        await sendMessage('announcements', await pollEvents(), true)
-        await sendMessage('announcements', await todaysEvents(), true)
+        await pollEvents().then(sendMessage('announcements', true))
+        await todaysEvents().then(sendMessage('announcements', true))
         break
       case 'pollEvents':
-        await sendMessage('announcements', await pollEvents(), true)
+        await pollEvents().then(sendMessage('announcements', true))
         break
       default:
         break
