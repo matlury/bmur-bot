@@ -160,7 +160,7 @@ resource "aws_lambda_function" "eventbird_lambda" {
   function_name = "eventbird-${var.github_sha}"
   s3_bucket     = "eventbird-package-bucket"
   s3_key        = "eventbird-package-${var.github_sha}.zip"
-  handler       = "src/index.handler"
+  handler       = "index.handler"
   role          = "${aws_iam_role.eventbird_iam_role.arn}"
   runtime       = "nodejs12.x"
 
