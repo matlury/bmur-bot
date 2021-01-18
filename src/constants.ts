@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-require('dotenv').config()
+require('dotenv').config({ silent: true })
 
 export const config = {
   telegramAPIToken: process.env.API_TOKEN as string,
