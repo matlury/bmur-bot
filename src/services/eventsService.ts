@@ -43,7 +43,7 @@ const retrieveEvents = async () => {
 }
 
 const newEvents = (events: EventObject[]) => {
-  if (events?.length === 0) return
+  if (!events || events.length === 0) return
 
   const eventHeader =
     events.length > 1 ? '*Uusia tapahtumia:* \n' : '*Uusi tapahtuma:* \n'
