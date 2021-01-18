@@ -40,6 +40,9 @@ jobs:
       run: |
         yarn install
         yarn build
+        rm -r ./node_modules
+        yarn install --production
+        cp -r ./node_modules ./build/
         cd ./deploy
         export TF_VAR_github_sha=${GITHUB_SHA::8}
         terraform plan -out=plan
