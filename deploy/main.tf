@@ -52,7 +52,7 @@ data "aws_subnet_ids" "private_subnet_ids" {
 
 data "archive_file" "eventbird_package_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/../"
+  source_dir  = "${path.module}/../build"
   output_path = "${path.module}/../eventbird.zip"
   excludes = [
     "eventbird.zip",
