@@ -11,15 +11,7 @@ const db = new pg.Client({
 export const createConnection = (): Promise<void> => db.connect()
 
 export const addNewEvent = ({ id, ...event }: EventObject): Promise<EventObject> =>
-  db
-    .query('INSERT INTO posted_events VALUES ($1)', [id])
-    .then(() => ({ ...event, id }))
-    .catch(e => {
-      console.error('failed to save events', e)
-      /* If we can't save the event to the database, we also shouldn't send the 
-      message to the telegram as that would lead to it being shown multiple times */
-      process.exit(1)
-    })
+  db.query('INSERT INTO posted_events VALUES ($1)', [id]).then(() => ({ ...event, id }))
 
 export const fetchPostedEvents = (): Promise<number[]> =>
   db
