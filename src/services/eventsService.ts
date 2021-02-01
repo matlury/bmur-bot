@@ -36,7 +36,7 @@ const retrieveEvents = async () => {
   const { data } = await axios.get<EventObject[]>(
     `https://event-api.tko-aly.fi/api/events?fromDate=${formatISO(
       sub(Date.now(), { months: 3 })
-    ).slice(0, -6)}` // Remove the timezone from the ISO date string
+    )}`
   )
 
   return R.filter(data, e => e.deleted === 0)
