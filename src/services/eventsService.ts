@@ -74,7 +74,7 @@ const formatEvents = (dateFormat: string, showRegistration: boolean) => (
         locale: fi,
       })
 
-  return `${prefix}: [${event.name.trim()}](http://tko-aly.fi/event/${event.id})`
+  return `${prefix}: [${event.name.trim()}](https://tko-aly.fi/event/${event.id})`
 }
 
 const filterPostedEvents = async (data: EventObject[]) => {
