@@ -48,7 +48,7 @@ const newEvents = (events: EventObject[]) => {
   const eventHeader =
     events.length > 1 ? '*Uusia tapahtumia:* \n' : '*Uusi tapahtuma:* \n'
 
-  const message = eventHeader + listEvents(events, 'dd.MM.yyy HH:MM', false)
+  const message = eventHeader + listEvents(events, 'dd.MM.yyy HH:mm', false)
   return message.trim()
 }
 
