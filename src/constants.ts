@@ -5,13 +5,6 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL,
 }
 
-export const restaurants = {
-  chemicum: 10,
-  exactum: 11,
-  porthania: 39,
-  yolo: 9,
-}
-
 export const channels = {
   announcements: process.env.TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID as string,
 }
