@@ -10,52 +10,50 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: eu-west-1
+      - uses: actions/checkout@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
 
-    - uses: actions/setup-node@v2-beta
-      with:
-        node-version: '12'
+      - uses: actions/setup-node@v2-beta
+        with:
+          node-version: '12'
 
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v1
-      with:
-        terraform_version: 0.12.24
-    - name: Terraform Init
-      run: |
-        cd ./deploy
-        terraform init
-    - name: Terraform Plan
-      env:
-        TF_VAR_api_token: ${{ secrets.API_TOKEN }}
-        TF_VAR_db_url: ${{ secrets.DB_URL }}
-        TF_VAR_event_api_token: ${{ secrets.EVENT_API_TOKEN }}
-        TF_VAR_telegram_announce_broadcast_channel: ${{ secrets.TELEGRAM_ANNOUNCE_BROADCAST_CHANNEL }}
-        TF_VAR_telegram_daily_broadcast_channel: ${{ secrets.TELEGRAM_DAILY_BROADCAST_CHANNEL }}
-      run: |
-        yarn install
-        yarn build
-        rm -r ./node_modules
-        yarn install --production
-        cp -r ./node_modules ./build/
-        cp -r ./migrations ./build/
-        cp knexfile.js ./build/knexfile.js
-        cd ./deploy
-        export TF_VAR_github_sha=${GITHUB_SHA::8}
-        terraform plan -out=plan
-    - name: Terraform Apply
-      env:
-        TF_VAR_api_token: ${{ secrets.API_TOKEN }}
-        TF_VAR_db_url: ${{ secrets.DB_URL }}
-        TF_VAR_event_api_token: ${{ secrets.EVENT_API_TOKEN }}
-        TF_VAR_telegram_announce_broadcast_channel: ${{ secrets.TELEGRAM_ANNOUNCE_BROADCAST_CHANNEL }}
-        TF_VAR_telegram_daily_broadcast_channel: ${{ secrets.TELEGRAM_DAILY_BROADCAST_CHANNEL }}
-      run: |
-        cd ./deploy
-        export TF_VAR_github_sha=${GITHUB_SHA::8}
-        terraform apply plan
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 0.12.24
+      - name: Terraform Init
+        run: |
+          cd ./deploy
+          terraform init
+      - name: Terraform Plan
+        env:
+          TF_VAR_api_token: ${{ secrets.API_TOKEN }}
+          TF_VAR_db_url: ${{ secrets.DB_URL }}
+          TF_VAR_event_api_token: ${{ secrets.EVENT_API_TOKEN }}
+          TF_VAR_telegram_announce_broadcast_channel: ${{ secrets.TELEGRAM_ANNOUNCE_BROADCAST_CHANNEL }}
+        run: |
+          yarn install
+          yarn build
+          rm -r ./node_modules
+          yarn install --production
+          cp -r ./node_modules ./build/
+          cp -r ./migrations ./build/
+          cp knexfile.js ./build/knexfile.js
+          cd ./deploy
+          export TF_VAR_github_sha=${GITHUB_SHA::8}
+          terraform plan -out=plan
+      - name: Terraform Apply
+        env:
+          TF_VAR_api_token: ${{ secrets.API_TOKEN }}
+          TF_VAR_db_url: ${{ secrets.DB_URL }}
+          TF_VAR_event_api_token: ${{ secrets.EVENT_API_TOKEN }}
+          TF_VAR_telegram_announce_broadcast_channel: ${{ secrets.TELEGRAM_ANNOUNCE_BROADCAST_CHANNEL }}
+        run: |
+          cd ./deploy
+          export TF_VAR_github_sha=${GITHUB_SHA::8}
+          terraform apply plan

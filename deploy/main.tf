@@ -27,10 +27,6 @@ variable "telegram_announce_broadcast_channel" {
   type = "string"
 }
 
-variable "telegram_daily_broadcast_channel" {
-  type = "string"
-}
-
 variable "event_api_token" {
   type = "string"
 }
@@ -168,7 +164,6 @@ resource "aws_lambda_function" "eventbird_lambda" {
     variables = {
       API_TOKEN                                  = "${var.api_token}"
       TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID = "${var.telegram_announce_broadcast_channel}"
-      TELEGRAM_DAILY_BROADCAST_CHANNEL_ID        = "${var.telegram_daily_broadcast_channel}"
       EVENT_API_TOKEN                            = "${var.event_api_token}"
       DATABASE_URL                               = "${var.db_url}"
     }
@@ -235,29 +230,4 @@ resource "aws_lambda_permission" "eventbird_todays_events_event_permission" {
   function_name = "${aws_lambda_function.eventbird_lambda.function_name}"
   principal     = "events.amazonaws.com"
   source_arn    = "${aws_cloudwatch_event_rule.eventbird_todays_events_event.arn}"
-}
-
-resource "aws_cloudwatch_event_rule" "eventbird_todays_food_event" {
-  name                = "eventbird-todays-food"
-  is_enabled          = true
-  schedule_expression = "cron(0 7 ? * MON-FRI *)"
-}
-
-resource "aws_cloudwatch_event_target" "eventbird_todays_food_event_target" {
-  target_id = "eventbird_lambda"
-  arn       = "${aws_lambda_function.eventbird_lambda.arn}"
-  rule      = "${aws_cloudwatch_event_rule.eventbird_todays_food_event.name}"
-  input     = <<EOF
-{
-  "jobMode": "postFood"
-}
-EOF
-}
-
-resource "aws_lambda_permission" "eventbird_todays_food_event_permissions" {
-  statement_id  = "AllowExecutionFromCloudWatchForTodaysFood"
-  action        = "lambda:InvokeFunction"
-  function_name = "${aws_lambda_function.eventbird_lambda.function_name}"
-  principal     = "events.amazonaws.com"
-  source_arn    = "${aws_cloudwatch_event_rule.eventbird_todays_food_event.arn}"
 }

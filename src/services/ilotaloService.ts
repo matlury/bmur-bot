@@ -10,16 +10,8 @@ export const todaysEvents = async (): Promise<string> => {
   const events = await retrieveEvents()
   const eventsToday = R.filter(events, e => isToday(parseISO(e.starts)))
 
-  const registrationToday = R.filter(events, e =>
-    isToday(parseISO(e.registration_starts))
-  )
-
-  if (eventsToday?.length > 0 || registrationToday?.length > 0) {
-    return `*Tänään:* \n ${listEvents(eventsToday, 'HH:mm', false)} ${listEvents(
-      registrationToday,
-      'HH:mm',
-      true
-    )}`
+  if (eventsToday?.length > 0) {
+    return `*Today:* \n ${listEvents(eventsToday, 'HH:mm')}`
   }
 }
 
@@ -34,47 +26,38 @@ export const pollEvents = async (): Promise<string> => {
 
 const retrieveEvents = async () => {
   const { data } = await axios.get<EventObject[]>(
-    `https://event-api.tko-aly.fi/api/events?fromDate=${formatISO(
+    `https://ilotalo-api.hugis.workers.dev/reservations/all?from=${formatISO(
       sub(Date.now(), { months: 3 })
     )}`
   )
 
-  return R.filter(data, e => e.deleted === 0)
+  return R.filter(data, e => e.closed === false)
 }
 
 const newEvents = (events: EventObject[]) => {
   if (!events || events.length === 0) return
 
-  const eventHeader =
-    events.length > 1 ? '*Uusia tapahtumia:* \n' : '*Uusi tapahtuma:* \n'
+  const eventHeader = events.length > 1 ? '*New events:* \n' : '*New event:* \n'
 
-  const message = eventHeader + listEvents(events, 'dd.MM.yyy HH:mm', false)
+  const message = eventHeader + listEvents(events, 'dd.MM.yyy HH:mm')
   return message.trim()
 }
 
-const listEvents = (
-  events: EventObject[],
-  dateFormat: string,
-  showRegistrationTimes: boolean
-) =>
+const listEvents = (events: EventObject[], dateFormat: string) =>
   R.pipe(
     events,
-    R.map(formatEvents(dateFormat, showRegistrationTimes)),
+    R.map(formatEvents(dateFormat)),
     R.reduce((response, event) => (response += `${event} \n`), '')
   )
 
-const formatEvents = (dateFormat: string, showRegistration: boolean) => (
-  event: EventObject
-) => {
-  const prefix = showRegistration
-    ? `Ilmo aukeaa ${format(parseISO(event.registration_starts), dateFormat, {
-        locale: fi,
-      })}`
-    : format(parseISO(event.starts), dateFormat, {
-        locale: fi,
-      })
+const formatEvents = (dateFormat: string) => (event: EventObject) => {
+  const prefix = format(parseISO(event.starts), dateFormat, {
+    locale: fi,
+  })
 
-  return `${prefix}: [${event.name.trim()}](https://tko-aly.fi/event/${event.id})`
+  return `${prefix}: [${event.name.trim()}](https://ilotalo.matlu.fi/index.php?page=res&id=${
+    event.id
+  })`
 }
 
 const filterPostedEvents = async (data: EventObject[]) => {

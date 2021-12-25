@@ -13,6 +13,5 @@ export const restaurants = {
 }
 
 export const channels = {
-  daily: process.env.TELEGRAM_DAILY_BROADCAST_CHANNEL_ID as string,
   announcements: process.env.TELEGRAM_ANNOUNCEMENT_BROADCAST_CHANNEL_ID as string,
 }

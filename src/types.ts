@@ -158,16 +158,8 @@ export type JobMode = 'postFood' | 'todaysEvents' | 'pollEvents'
 
 export interface EventObject {
   id: number
-  name: string
-  user_id: number
-  created: string
   starts: string
-  registration_starts: string
-  registration_ends: string
-  cancellation_starts: string
-  cancellation_ends: string
-  location: string
-  category: string
-  description: string
-  deleted: number
+  name: string
+  association: string
+  closed: boolean
 }
