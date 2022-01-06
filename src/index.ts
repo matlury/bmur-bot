@@ -1,14 +1,12 @@
-import { migrate } from './db/eventDb'
+import { cronEvents } from './constants'
 import { pollEvents, todaysEvents } from './services/ilotaloService'
 import { sendMessage } from './services/telegramService'
 import { JobMode } from './types'
 
 const logJobMode = (jobMode: string) => console.log('Job mode is', jobMode)
 
-exports.handler = async ({ jobMode }: { jobMode: JobMode }) => {
+export const handleEvent = async ({ jobMode }: { jobMode: JobMode }) => {
   logJobMode(jobMode)
-
-  await migrate()
 
   try {
     switch (jobMode) {
@@ -26,3 +24,5 @@ exports.handler = async ({ jobMode }: { jobMode: JobMode }) => {
     console.error(error)
   }
 }
+
+exports.handler = handleEvent

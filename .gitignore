@@ -40,3 +40,9 @@ override.tf.json
 .vscode
 
 eventbird.zip
+
+dist
+
+yarn-error.log
+
+cdk.out

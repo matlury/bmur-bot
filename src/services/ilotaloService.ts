@@ -1,7 +1,7 @@
-import axios from 'axios'
 import { format, formatISO, isToday, parseISO, sub } from 'date-fns'
 import fi from 'date-fns/locale/fi'
 import * as R from 'remeda'
+import axios from 'axios'
 
 import { addNewEvent, fetchPostedEvents } from '../db/eventDb'
 import { EventObject } from '../types'
@@ -9,7 +9,6 @@ import { EventObject } from '../types'
 export const todaysEvents = async (): Promise<string> => {
   const events = await retrieveEvents()
   const eventsToday = R.filter(events, e => isToday(parseISO(e.starts)))
-
   if (eventsToday?.length > 0) {
     return `*Today:* \n ${listEvents(eventsToday, 'HH:mm')}`
   }
@@ -25,12 +24,13 @@ export const pollEvents = async (): Promise<string> => {
 }
 
 const retrieveEvents = async () => {
-  const { data } = await axios.get<EventObject[]>(
-    `https://ilotalo-api.hugis.workers.dev/reservations/all?from=${formatISO(
-      sub(Date.now(), { months: 3 })
-    )}`
-  )
-
+  const data = await axios
+    .get<EventObject[]>(
+      `https://ilotalo-api.hugis.workers.dev/reservations/all?from=${formatISO(
+        sub(Date.now(), { months: 3 })
+      )}`
+    )
+    .then(res => res.data)
   return R.filter(data, e => e.closed === false)
 }
 
@@ -57,7 +57,7 @@ const formatEvents = (dateFormat: string) => (event: EventObject) => {
 
   return `${prefix}: [${event.name.trim()}](https://ilotalo.matlu.fi/index.php?page=res&id=${
     event.id
-  })`
+  }) (${event.association})`
 }
 
 const filterPostedEvents = async (data: EventObject[]) => {

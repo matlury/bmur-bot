@@ -1,14 +1,15 @@
-FROM node:12-alpine
+FROM public.ecr.aws/lambda/nodejs:14
 
-RUN apk --no-cache add --virtual native-deps \
-  g++ gcc libgcc libstdc++ linux-headers make python
+RUN npm install -g yarn
 
 WORKDIR /app
 COPY yarn.lock ./
 COPY package.json ./
+COPY tsconfig.json ./
 RUN yarn
 
 COPY src ./src
-COPY migrations ./migrations
 
-CMD ["yarn", "start"]
+RUN yarn build
+
+CMD ["/app/build/index.handler"]
